@@ -1,35 +1,38 @@
-<script setup>
-    import { ref } from 'vue'
-    import axios from 'axios'
-    import { useRouter } from 'vue-router'
-    const router = useRouter()
-    const username = ref('')
-    const password = ref('')
-
-    async function login() {
-        // call backend /login
-        try {
-        const res = await axios.post('http://localhost:3000/login', { username: username.value, password: password.value })
-        localStorage.setItem('token', res.data.access_token)
-        router.push('/')
-        } catch (e) {
-        alert('Login failed')
-        }
-    }
-</script>
-
 <template>
-    <div class="max-w-md mx-auto">
-        <h1 class="text-xl font-semibold text-dns_dark mb-4">Login</h1>
-        <form @submit.prevent="login">
-            <div class="mb-3">
-                <input v-model="username" placeholder="Username" class="w-full border p-2 rounded" />
-            </div>
-            <div class="mb-3">
-                <input type="password" v-model="password" placeholder="Password" class="w-full border p-2 rounded" />
-            </div>
-            <button class="px-4 py-2 bg-dns_dark text-white rounded">Login</button>
-        </form>
-    </div>
-</template>
+  <div class="min-h-screen w-full flex items-center justify-center bg-green-900/70 bg-blend-overlay bg-[url('/images/bg-building.jpg')] bg-cover bg-center bg-no-repeat">
+    <div class="bg-white/90 backdrop-blur-md p-8 rounded-2xl shadow-lg w-full max-w-md mx-4">
+      <div class="flex flex-col items-center">
+        <h2 class="text-2xl font-bold mb-6 text-green-800">Sign In</h2>
+      </div>
 
+      <form @submit.prevent="handleLogin" class="space-y-4">
+        <input
+          v-model="email"
+          type="email"
+          placeholder="Email address"
+          class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+        />
+        <input
+          v-model="password"
+          type="password"
+          placeholder="Password"
+          class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+        />
+
+        <button
+          type="submit"
+          class="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg transition"
+          :disabled="loading"
+        >
+          <span v-if="!loading">Sign In</span>
+          <span v-else>Signing in...</span>
+        </button>
+      </form>
+
+      <p class="text-center text-sm text-gray-600 mt-4">
+        Don’t have an account?
+        <router-link to="/register" class="text-green-700 hover:underline">Register Now</router-link>
+      </p>
+    </div>
+  </div>
+</template>

@@ -5,7 +5,7 @@
             <div class="text-lg font-semibold text-dns_dark">DAVAO DEL NORTE STATE COLLEGE</div>
         </div>
         <div class="flex items-center gap-4">
-            <div class="text-sm">Admin</div>
+            <i class="pi pi-user"></i><div class="text-sm">Admin</div>
             <button class="px-3 py-1 rounded bg-dns_dark text-white">Logout</button>
         </div>
     </header>
