@@ -69,20 +69,6 @@
         "contactEmail": "contact@ipsumlorem.com",
         "contactPhone": "555-555-5555"
       }
-    },
-    {
-      "title": "gtest",
-      "type": "Full-Time",
-      "location": "fdfdf",
-      "description": "fdfd",
-      "salary": "$50K - $60K",
-      "company": {
-        "name": "fdfd",
-        "description": "fdfd",
-        "contactEmail": "df@gmail.com",
-        "contactPhone": "fdfd"
-      },
-      "id": "f557"
     }
   ]
 }

@@ -13,9 +13,10 @@ export default defineConfig({
       },
       gridTemplateColumns: {
         '70/30': '70% 28%',
-      },
+      }, 
     },
   },
+  
   plugins: [vue(),tailwindcss(),],
     server:{
       port: 3000,

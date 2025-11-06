@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+
+@theme {
+  --color-dns_dark: #0f6030;
+  --color-dns_green: #117a43;
+  --color-dns_beige: #f7efe6;
+  --font-sans: "Poppins", sans-serif;
+}
+
+html, body, #app {
+  height: 100%;
+  background-color: var(--color-dns_beige);
+}
