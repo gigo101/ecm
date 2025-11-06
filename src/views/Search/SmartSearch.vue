@@ -1,14 +1,14 @@
 <script setup>
-import { ref } from 'vue'
-const query = ref('')
-const results = ref([])
+    import { ref } from 'vue'
+    const query = ref('')
+    const results = ref([])
 
-async function search() {
-// placeholder: call your backend search API
-results.value = [
-{ id: 1, title: 'Student Handbook.pdf', snippet: 'Guidelines on conduct, ...', score: 0.92 }
-]
-}
+    async function search() {
+    // placeholder: call your backend search API
+    results.value = [
+    { id: 1, title: 'Student Handbook.pdf', snippet: 'Guidelines on conduct, ...', score: 0.92 }
+    ]
+    }
 </script>
 
 <template>
