@@ -6,16 +6,43 @@ import Search from '@/views/Search/SmartSearch.vue'
 import Chatbot from '@/views/Chatbot.vue'
 import Login from '@/views/Auth/Login.vue'
 import AdminUsers from '@/views/Admin/Users.vue'
-
+import NotFoundView from "@/views/NotFound.vue";
 
 const routes = [
-{ path: '/', component: Dashboard },
-{ path: '/documents', component: Documents },
-{ path: '/upload', component: Upload },
-{ path: '/search', component: Search },
-{ path: '/chat', component: Chatbot },
-{ path: '/login', component: Login },
-{ path: '/admin/users', component: AdminUsers }
+{ 
+    path: '/', 
+    component: Dashboard 
+},
+{ 
+    path: '/documents', 
+    component: Documents 
+},
+{ 
+    path: '/upload', 
+    component: Upload 
+},
+{ 
+    path: '/search', 
+    component: Search 
+},
+{ 
+    path: '/chat', 
+    component: Chatbot 
+},
+{ 
+    path: '/login', 
+    component: Login 
+},
+{ 
+    path: '/admin/users', 
+    component: AdminUsers 
+},
+{ 
+    path: '/:catchAll(.*)', 
+    name: 'not-found',
+    component: NotFoundView
+}
+
 ]
 
 const router = createRouter({
