@@ -1,40 +1,44 @@
 <script setup>
 import { ref } from "vue";
-import api from "@/api";
+import api from "../api";
+
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-const email = ref("admin@example.com"); // prefill for testing
-const password = ref("admin123");       // prefill for testing
+
+const email = ref("admin@example.com"); // demo only
+const password = ref("admin123");       // demo only
 const loading = ref(false);
 const error = ref("");
 
 async function handleLogin() {
+  loading.value = true;
+  error.value = "";
+
   try {
-    loading.value = true;
-    error.value = "";
+    // === IMPORTANT: FastAPI expects form-urlencoded ===
+    const data = new URLSearchParams();
+    data.append("username", email.value);
+    data.append("password", password.value);
 
-    // FastAPI expects "application/x-www-form-urlencoded"
-    const res = await api.post(
-      "/auth/login",
-      new URLSearchParams({
-        username: email.value,
-        password: password.value,
-      }),
-      {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      }
-    );
+    const response = await api.post("/auth/login", data, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
 
-    const token = res.data.access_token;
+    const token = response.data.access_token;
+
+    // Save JWT
     localStorage.setItem("token", token);
+
+    // Redirect
     router.push("/documents");
   } catch (err) {
     console.error("Login failed:", err);
-    if (err.response && err.response.data && err.response.data.detail) {
+
+    if (err.response?.data?.detail) {
       error.value = err.response.data.detail;
     } else {
-      error.value = "Invalid email or password";
+      error.value = "Login failed. Check your connection.";
     }
   } finally {
     loading.value = false;
@@ -67,9 +71,9 @@ async function handleLogin() {
           <input
             v-model="email"
             type="email"
-            placeholder="admin@example.com"
             required
-            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition"
+            placeholder="admin@example.com"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
           />
         </div>
 
@@ -80,9 +84,9 @@ async function handleLogin() {
           <input
             v-model="password"
             type="password"
-            placeholder="••••••••"
             required
-            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition"
+            placeholder="••••••••"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
           />
         </div>
 
@@ -92,8 +96,8 @@ async function handleLogin() {
 
         <button
           type="submit"
-          class="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-3 rounded-lg shadow-lg transition disabled:opacity-70"
           :disabled="loading"
+          class="w-full bg-green-700 hover:bg-green-800 text-white font-semibold py-3 rounded-lg shadow-lg disabled:opacity-70 transition"
         >
           <span v-if="!loading">Sign In</span>
           <span v-else>Signing in...</span>
