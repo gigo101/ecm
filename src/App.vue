@@ -1,5 +1,5 @@
 <template>
-  <div v-if="route.path === '/' || route.path === '/documents' || route.path === '/search' || route.path === '/chat' || route.path === '/admin/users'" class="min-h-screen flex bg-dns_beige">
+  <div v-if="route.path === '/' || route.path === '/documents' || route.path === '/search' || route.path === '/chat' || route.path === '/admin/users' || route.path ==='/documents/upload'" class="min-h-screen flex bg-dns_beige">
     <Sidebar />
     <div class="flex-1 flex flex-col">
       <Navbar />

@@ -10,7 +10,7 @@
     <div>
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-xl font-semibold text-dns_dark">Documents</h1>
-            <router-link to="/upload" class="px-4 py-2 bg-dns_dark text-white rounded">Upload</router-link>
+            <router-link to="/documents/upload" class="px-4 py-2 bg-dns_dark text-white rounded">Upload</router-link>
         </div>
 
         <div class="bg-white p-4 rounded shadow">

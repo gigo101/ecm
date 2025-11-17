@@ -10,7 +10,7 @@ import NotFoundView from "@/views/NotFound.vue";
 import Login2 from '@/views/Login2.vue'; 
 import AddNumber from '@/views/AddNumbers.vue';
 import Register from '@/views/Auth/Register.vue'
-
+import UploadDocument from '@/views/Documents/UploadDocument.vue'
 const routes = [
 { 
     path: '/', 
@@ -21,8 +21,12 @@ const routes = [
     component: Documents 
 },
 { 
-    path: '/upload', 
+    path: '/upload2', 
     component: Upload 
+},
+{
+  path: "/documents/upload",
+  component: UploadDocument
 },
 { 
     path: '/search', 
