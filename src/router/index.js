@@ -11,13 +11,20 @@ import Login2 from '@/views/Login2.vue';
 import AddNumber from '@/views/AddNumbers.vue';
 import Register from '@/views/Auth/Register.vue'
 import UploadDocument from '@/views/Documents/UploadDocument.vue'
+import DocumentList from '@/views/Documents/DocumentList.vue'
+import ChangePassword from '@/views/Auth/ChangePassword.vue'
+
 const routes = [
 { 
     path: '/', 
-    component: Dashboard 
+    component: Login
 },
 { 
-    path: '/documents', 
+    path: '/dashboard', 
+    component: Dashboard
+},
+{ 
+    path: '/documentss', 
     component: Documents 
 },
 { 
@@ -27,6 +34,11 @@ const routes = [
 {
   path: "/documents/upload",
   component: UploadDocument
+},
+{
+  path: "/documents",
+  name: "Documents",
+  component: DocumentList
 },
 { 
     path: '/search', 
@@ -56,6 +68,10 @@ const routes = [
     path: '/addnumber', 
     component: AddNumber 
 },
+{
+  path: "/change-password",
+  component: ChangePassword
+},
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',
@@ -70,3 +86,17 @@ routes
 })
 
 export default router
+
+
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem("token");
+
+  // Protected pages
+  const protectedPages = ["/dashboard", "/documents", "/documents/upload", "/change-pasword"];
+
+  if (protectedPages.includes(to.path) && !token) {
+    next("/login"); // Redirect if not logged in
+  } else {
+    next();
+  }
+});

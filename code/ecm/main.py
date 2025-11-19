@@ -141,6 +141,7 @@ async def read_users_me(token: str = Depends(oauth2_scheme)):
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+#Document upload end point
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -149,7 +150,7 @@ async def upload_document(
     file: UploadFile = File(...),
     description: str = Form(""),
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     # Decode token
     try:
@@ -177,3 +178,68 @@ async def upload_document(
     db.refresh(document)
 
     return {"message": "File uploaded successfully", "document_id": document.id}
+
+#Document list endpoint
+@app.get("/documents/list")
+async def list_documents(
+    db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme)
+):
+    # Verify user token
+    try:
+        user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    docs = db.query(Document).order_by(Document.uploaded_at.desc()).all()
+
+    return [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "description": d.description,
+            "uploaded_by": d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for d in docs
+    ]
+
+
+from fastapi.staticfiles import StaticFiles
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+
+
+#change password
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+@app.post("/auth/change-password")
+async def change_password(
+    req: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme)
+):
+    # Decode token
+    try:
+        user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_email = user_data["sub"]
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Get user
+    user = db.query(User).filter(User.email == user_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check old password
+    if not verify_password(req.old_password, user.password):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Update new password
+    user.password = hash_password(req.new_password)
+    db.commit()
+
+    return {"message": "Password updated successfully"}

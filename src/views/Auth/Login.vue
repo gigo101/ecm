@@ -28,7 +28,7 @@ async function handleLogin() {
 
     const token = res.data.access_token;
     localStorage.setItem("token", token);
-    router.push("/documents");
+    router.push("/dashboard");
   } catch (err) {
     console.error("Login failed:", err);
     if (err.response && err.response.data && err.response.data.detail) {
