@@ -51,11 +51,20 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # --- USER MODEL ---
+# class User(Base):
+#     __tablename__ = "users"
+#     id = Column(Integer, primary_key=True, index=True)
+#     email = Column(String(255), unique=True, index=True)
+#     password = Column(String(255))
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True)
+    name = Column(String(255), default="User")
+    role = Column(String(50), default="User")   # “Admin”, “Staff”, etc.
     password = Column(String(255))
+
 
 class Document(Base):
     __tablename__ = "documents"
@@ -132,14 +141,23 @@ async def login(
 
 # --- PROTECTED ROUTE ---
 @app.get("/users/me")
-async def read_users_me(token: str = Depends(oauth2_scheme)):
+async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return {"email": data["sub"]}
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
+        email = data["sub"]
+    except:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "email": user.email,
+        "name": user.name,
+        "role": user.role
+    }
+
 
 #Document upload end point
 UPLOAD_DIR = "uploads"

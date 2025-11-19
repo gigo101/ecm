@@ -13,6 +13,7 @@ import Register from '@/views/Auth/Register.vue'
 import UploadDocument from '@/views/Documents/UploadDocument.vue'
 import DocumentList from '@/views/Documents/DocumentList.vue'
 import ChangePassword from '@/views/Auth/ChangePassword.vue'
+import Profile from '@/views/Profile.vue'
 
 const routes = [
 { 
@@ -71,6 +72,11 @@ const routes = [
 {
   path: "/change-password",
   component: ChangePassword
+},
+{
+  path: "/profile",
+  component: Profile,
+  meta: { requiresAuth: true }
 },
 { 
     path: '/:catchAll(.*)', 
