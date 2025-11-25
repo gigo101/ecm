@@ -23,6 +23,13 @@ def hash_password(password: str):
 def verify_password(plain_password: str, hashed_password: str):
     return pwd_context.verify(plain_password, hashed_password)
 
+def require_role(required_roles: list):
+    def role_checker(user):
+        if user.role not in required_roles:
+            raise HTTPException(status_code=403, detail="Access denied")
+    return role_checker
+
+
 
 # --- FASTAPI APP ---
 app = FastAPI()
@@ -152,34 +159,49 @@ async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depen
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # return user
+
     return {
         "email": user.email,
         "name": user.name,
         "role": user.role
     }
 
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    try:
+        data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = data["sub"]
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
+
+
 
 #Document upload end point
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
 @app.post("/documents/upload")
 async def upload_document(
     file: UploadFile = File(...),
     description: str = Form(""),
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),  # already authenticated user
+    db: Session = Depends(get_db)
 ):
-    # Decode token
-    try:
-        user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_email = user_data["sub"]
-    except:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    # Role check
+    require_role(["Admin", "Staff"])(current_user)
 
-    # Save file to disk
+    # Save file
     file_location = f"{UPLOAD_DIR}/{file.filename}"
-
     with open(file_location, "wb+") as f:
         f.write(await file.read())
 
@@ -188,14 +210,20 @@ async def upload_document(
         filename=file.filename,
         filepath=file_location,
         description=description,
-        uploaded_by=user_email,
+        uploaded_by=current_user.email,   # simple & correct
     )
+
 
     db.add(document)
     db.commit()
     db.refresh(document)
 
-    return {"message": "File uploaded successfully", "document_id": document.id}
+    return {
+        "message": "File uploaded successfully",
+        "document_id": document.id
+    }
+
+
 
 #Document list endpoint
 @app.get("/documents/list")
@@ -261,3 +289,13 @@ async def change_password(
     db.commit()
 
     return {"message": "Password updated successfully"}
+
+@app.get("/admin/users")
+def list_all_users(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+    return db.query(User).all()
+
+
