@@ -147,8 +147,32 @@ async def login(
     return {"access_token": token, "token_type": "bearer"}
 
 # --- PROTECTED ROUTE ---
+# @app.get("/users/me")
+# async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+#     try:
+#         data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+#         email = data["sub"]
+#     except:
+#         raise HTTPException(status_code=401, detail="Invalid token")
+
+#     user = db.query(User).filter(User.email == email).first()
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found")
+
+#     # return user
+
+#     return {
+#         "email": user.email,
+#         "name": user.name,
+#         "role": user.role
+#     }
+
+# Protected Route
 @app.get("/users/me")
-async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def read_users_me(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
     try:
         data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = data["sub"]
@@ -159,13 +183,12 @@ async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depen
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # return user
-
     return {
         "email": user.email,
         "name": user.name,
         "role": user.role
     }
+
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -298,4 +321,32 @@ def list_all_users(
     require_role(["Admin"])(current_user)
     return db.query(User).all()
 
+
+@app.delete("/documents/{doc_id}")
+async def delete_document(
+    doc_id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Only ADMIN can delete documents
+    require_role(["Admin"])(current_user)
+
+    document = db.query(Document).filter(Document.id == doc_id).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Delete file from disk
+    try:
+        import os
+        if os.path.exists(document.filepath):
+            os.remove(document.filepath)
+    except Exception as e:
+        print("File delete error:", e)
+
+    # Delete DB record
+    db.delete(document)
+    db.commit()
+
+    return {"message": "Document deleted successfully"}
 
