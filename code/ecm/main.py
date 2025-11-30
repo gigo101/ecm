@@ -407,3 +407,60 @@ async def delete_user(
     db.commit()
 
     return {"message": "User deleted"}
+
+#user update model
+class UserUpdate(BaseModel):
+    name: str
+    email: str
+    role: str
+
+
+@app.put("/users/{user_id}")
+async def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.name = user_data.name
+    user.email = user_data.email
+    user.role = user_data.role
+    db.commit()
+    db.refresh(user)
+
+    return {"message": "User updated successfully"}
+
+
+#change password model
+class PasswordChange(BaseModel):
+    old_password: str | None = None
+    new_password: str
+
+#change password route
+@app.put("/users/{user_id}/password")
+async def change_password(
+    user_id: int,
+    data: PasswordChange,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Admin can reset passwords without old password
+    if current_user.role != "Admin":
+        if not verify_password(data.old_password, user.password):
+            raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Hash new password
+    user.password = hash_password(data.new_password)
+    db.commit()
+
+    return {"message": "Password updated successfully"}
