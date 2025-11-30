@@ -71,6 +71,7 @@ class User(Base):
     name = Column(String(255), default="User")
     role = Column(String(50), default="User")   # “Admin”, “Staff”, etc.
     password = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Document(Base):
@@ -350,3 +351,59 @@ async def delete_document(
 
     return {"message": "Document deleted successfully"}
 
+#Get all users - Admin only
+@app.get("/users")
+async def list_users(
+    current_user=Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)  # Admin only
+
+    users = db.query(User).all()
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "name": u.name,
+            "role": u.role,
+            "created_at": u.created_at,
+        }
+        for u in users
+    ]
+
+#Update User Role
+@app.put("/users/{user_id}/role")
+async def update_user_role(
+    user_id: int,
+    role: str,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.role = role
+    db.commit()
+    return {"message": "User role updated"}
+
+
+#Delete User
+@app.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.delete(user)
+    db.commit()
+
+    return {"message": "User deleted"}
