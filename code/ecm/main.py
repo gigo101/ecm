@@ -64,16 +64,38 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 #     email = Column(String(255), unique=True, index=True)
 #     password = Column(String(255))
 
+# class User(Base):
+#     __tablename__ = "users"
+#     id = Column(Integer, primary_key=True, index=True)
+#     email = Column(String(255), unique=True, index=True)
+#     name = Column(String(255), default="User")
+#     role = Column(String(50), default="User")   # “Admin”, “Staff”, etc.
+#     password = Column(String(255))
+#     created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class User(Base):
     __tablename__ = "users"
+
     id = Column(Integer, primary_key=True, index=True)
+
+    first_name = Column(String(255))
+    middle_name = Column(String(255))
+    last_name = Column(String(255))
+    suffix = Column(String(50), nullable=True)
+    position = Column(String(255))
+    office = Column(String(255))
+
     email = Column(String(255), unique=True, index=True)
-    name = Column(String(255), default="User")
-    role = Column(String(50), default="User")   # “Admin”, “Staff”, etc.
     password = Column(String(255))
+
+    role = Column(String(50), default="User")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+
+
+# --- DOCUMENT MODEL ---
 class Document(Base):
     __tablename__ = "documents"
 
@@ -93,9 +115,20 @@ class Token(BaseModel):
     token_type: str
 
 # Request body for registration
+# class UserCreate(BaseModel):
+#     email: str
+#     password: str
+
 class UserCreate(BaseModel):
+    first_name: str
+    middle_name: str
+    last_name: str
+    suffix: str | None = None
+    position: str
+    office: str
     email: str
     password: str
+
 
 # --- DB DEPENDENCY ---
 def get_db():
@@ -107,9 +140,28 @@ def get_db():
 
 
 # Register API
+# @app.post("/auth/register")
+# async def register_user(user: UserCreate, db: Session = Depends(get_db)):
+#     # Check for duplicates
+#     existing = db.query(User).filter(User.email == user.email).first()
+#     if existing:
+#         raise HTTPException(status_code=400, detail="Email already registered")
+
+#     # Hash password
+#     hashed_pw = hash_password(user.password)
+
+#     # Insert new user
+#     new_user = User(email=user.email, password=hashed_pw)
+#     db.add(new_user)
+#     db.commit()
+#     db.refresh(new_user)
+
+#     return {"message": "User registered successfully"}
+
 @app.post("/auth/register")
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    # Check for duplicates
+
+    # Check duplicate email
     existing = db.query(User).filter(User.email == user.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -117,8 +169,19 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     # Hash password
     hashed_pw = hash_password(user.password)
 
-    # Insert new user
-    new_user = User(email=user.email, password=hashed_pw)
+    # Create user
+    new_user = User(
+        first_name=user.first_name,
+        middle_name=user.middle_name,
+        last_name=user.last_name,
+        suffix=user.suffix,
+        position=user.position,
+        office=user.office,
+        email=user.email,
+        password=hashed_pw,
+        role="User",
+    )
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -175,20 +238,30 @@ async def read_users_me(
     db: Session = Depends(get_db)
 ):
     try:
-        data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = data["sub"]
-    except:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    # Query the full User model
     user = db.query(User).filter(User.email == email).first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     return {
         "email": user.email,
-        "name": user.name,
+        "first_name": user.first_name,
+        "middle_name": user.middle_name,
+        "last_name": user.last_name,
+        "name": f"{user.first_name} {user.middle_name or ''} {user.last_name}".strip(),
         "role": user.role
     }
+
 
 
 def get_current_user(
@@ -354,22 +427,26 @@ async def delete_document(
 #Get all users - Admin only
 @app.get("/users")
 async def list_users(
-    current_user=Depends(get_current_user), 
+    current_user=Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    require_role(["Admin"])(current_user)  # Admin only
+    require_role(["Admin"])(current_user)
 
     users = db.query(User).all()
     return [
         {
             "id": u.id,
             "email": u.email,
-            "name": u.name,
+            "first_name": u.first_name,
+            "middle_name": u.middle_name,
+            "last_name": u.last_name,
             "role": u.role,
             "created_at": u.created_at,
         }
         for u in users
     ]
+
+
 
 #Update User Role
 @app.put("/users/{user_id}/role")

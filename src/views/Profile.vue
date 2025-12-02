@@ -5,7 +5,9 @@ import api from "@/api";
 const name = ref("");
 const email = ref("");
 const role = ref("");
-
+const first_name = ref("");
+const middle_name = ref("");
+const last_name = ref("");
 const loading = ref(true);
 
 async function loadProfile() {
@@ -14,6 +16,9 @@ async function loadProfile() {
     name.value = res.data.name;
     email.value = res.data.email;
     role.value = res.data.role;
+    first_name.value = res.data.first_name;
+    middle_name.value = res.data.middle_name;
+    last_name.value = res.data.last_name;
   } catch (err) {
     console.error("Failed to load profile", err);
   } finally {
@@ -34,8 +39,18 @@ onMounted(loadProfile);
 
       <template v-else>
         <div class="flex flex-col gap-1">
-          <label class="text-gray-500 text-sm">Name</label>
-          <div class="text-lg font-semibold">{{ name }}</div>
+          <label class="text-gray-500 text-sm">First Name</label>
+          <div class="text-lg font-semibold">{{ first_name }}</div>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label class="text-gray-500 text-sm">Middle Name</label>
+          <div class="text-lg font-semibold">{{ middle_name }}</div>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label class="text-gray-500 text-sm">Last Name</label>
+          <div class="text-lg font-semibold">{{ last_name }}</div>
         </div>
 
         <div class="flex flex-col gap-1">

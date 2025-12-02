@@ -14,6 +14,7 @@ import UploadDocument from '@/views/Documents/UploadDocument.vue'
 import DocumentList from '@/views/Documents/DocumentList.vue'
 import ChangePassword from '@/views/Auth/ChangePassword.vue'
 import Profile from '@/views/Profile.vue'
+import Userlist from '@/views/Userlist.vue'
 
 const routes = [
 { 
@@ -78,6 +79,11 @@ const routes = [
   component: Profile,
   meta: { requiresAuth: true }
 },
+{
+  path: "/users",
+  component: Userlist,
+  meta: { requiresAuth: true, requiresAdmin: true }
+},
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',
@@ -105,4 +111,9 @@ router.beforeEach((to, from, next) => {
   } else {
     next();
   }
+
+  if (to.meta.requiresAdmin && localStorage.getItem("role") !== "Admin") {
+  return next("/unauthorized");
+}
+
 });

@@ -15,7 +15,7 @@
         :aria-expanded="showMenu.toString()"
       >
         <i class="pi pi-user text-dns_dark text-lg"></i>
-        <span class="text-sm text-dns_dark font-medium">Admin</span>
+        <span class="text-sm text-dns_dark font-medium">Account</span>
 
         <svg
           class="w-4 h-4 text-dns_dark"

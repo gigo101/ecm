@@ -9,37 +9,62 @@ const password = ref("admin123");       // prefill for testing
 const loading = ref(false);
 const error = ref("");
 
+// async function handleLogin() {
+//   try {
+//     loading.value = true;
+//     error.value = "";
+
+//     // FastAPI expects "application/x-www-form-urlencoded"
+//     const res = await api.post(
+//       "/auth/login",
+//       new URLSearchParams({
+//         username: email.value,
+//         password: password.value,
+//       }),
+//       {
+//         headers: { "Content-Type": "application/x-www-form-urlencoded" },
+//       }
+//     );
+
+//     const token = res.data.access_token;
+//     localStorage.setItem("token", token);
+//     router.push("/dashboard");
+//   } catch (err) {
+//     console.error("Login failed:", err);
+//     if (err.response && err.response.data && err.response.data.detail) {
+//       error.value = err.response.data.detail;
+//     } else {
+//       error.value = "Invalid email or password";
+//     }
+//   } finally {
+//     loading.value = false;
+//   }
+// }
+
 async function handleLogin() {
   try {
-    loading.value = true;
-    error.value = "";
+    const data = new URLSearchParams();
+    data.append("username", email.value);
+    data.append("password", password.value);
 
-    // FastAPI expects "application/x-www-form-urlencoded"
-    const res = await api.post(
-      "/auth/login",
-      new URLSearchParams({
-        username: email.value,
-        password: password.value,
-      }),
-      {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      }
-    );
+    const response = await api.post("/auth/login", data, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    });
 
-    const token = res.data.access_token;
+    const token = response.data.access_token;
     localStorage.setItem("token", token);
-    router.push("/dashboard");
+
+    // FETCH USER PROFILE HERE
+    const user = await api.get("/users/me");
+    localStorage.setItem("role", user.data.role);
+    localStorage.setItem("name", user.data.name);
+
+    router.push("/documents");
   } catch (err) {
-    console.error("Login failed:", err);
-    if (err.response && err.response.data && err.response.data.detail) {
-      error.value = err.response.data.detail;
-    } else {
-      error.value = "Invalid email or password";
-    }
-  } finally {
-    loading.value = false;
+    error.value = "Login failed.";
   }
 }
+
 </script>
 
 <template>

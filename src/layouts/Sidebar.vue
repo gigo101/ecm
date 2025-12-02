@@ -1,4 +1,11 @@
 <script setup>
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+
+// Get the user role
+const role = ref(localStorage.getItem("role"));
 </script>
 
 <template>
@@ -12,6 +19,14 @@
         <router-link to="/search" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">Search</router-link>
         <router-link to="/chat" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">Chatbot</router-link>
         <router-link to="/admin/users" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">Admin</router-link>
+        <!-- User Management (Admin only) -->
+      <router-link
+        v-if="role === 'Admin'"
+        to="/users" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
+      >
+        👥 User Management
+      </router-link>
+
     </nav>
     </aside>
 </template>

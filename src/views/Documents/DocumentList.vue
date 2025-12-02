@@ -7,6 +7,9 @@ const loading = ref(true);
 const error = ref("");
 const search = ref("");
 
+const role = ref(localStorage.getItem("role")); // ROLE STORED HERE
+
+// Fetch all documents
 async function fetchDocuments() {
   loading.value = true;
 
@@ -21,6 +24,7 @@ async function fetchDocuments() {
   }
 }
 
+// Search filter
 function filteredDocuments() {
   if (!search.value) return documents.value;
   return documents.value.filter(d =>
@@ -29,10 +33,28 @@ function filteredDocuments() {
   );
 }
 
+// Download
 function downloadFile(filename) {
   window.open(`http://127.0.0.1:8000/uploads/${filename}`, "_blank");
 }
 
+// Delete
+async function deleteDocument(id) {
+  if (!confirm("Are you sure you want to delete this document?")) return;
+
+  try {
+    await api.delete(`/documents/${id}`);
+    alert("Document deleted successfully!");
+
+    // Reload
+    fetchDocuments();
+  } catch (err) {
+    console.error("Delete error:", err);
+    alert("Failed to delete document.");
+  }
+}
+
+// Load on page load
 onMounted(() => {
   fetchDocuments();
 });
@@ -40,10 +62,16 @@ onMounted(() => {
 
 <template>
   <div class="p-8">
-         <div class="flex justify-between items-center mb-4">
-            <h1 class="text-xl font-semibold text-dns_dark">Documents</h1>
-            <router-link to="/documents/upload" class="px-4 py-2 bg-dns_dark text-white rounded">Upload</router-link>
-        </div>
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-xl font-semibold text-dns_dark">Documents</h1>
+      <router-link v-if="role==='Admin'"
+        to="/documents/upload"
+        class="px-4 py-2 bg-dns_dark text-white rounded"
+      >
+        Upload
+      </router-link>
+    </div>
+
     <!-- Search bar -->
     <input
       v-model="search"
@@ -55,17 +83,14 @@ onMounted(() => {
     <div v-if="loading" class="text-gray-600">Loading...</div>
     <div v-if="error" class="text-red-600">{{ error }}</div>
 
-    <table
-      v-if="!loading"
-      class="w-full bg-white shadow-lg rounded-lg overflow-hidden"
-    >
+    <table v-if="!loading" class="w-full bg-white shadow-lg rounded-lg overflow-hidden">
       <thead class="bg-green-700 text-white">
         <tr>
           <th class="p-3 text-left">Filename</th>
           <th class="p-3 text-left">Description</th>
           <th class="p-3 text-left">Uploaded By</th>
           <th class="p-3 text-left">Date</th>
-          <th class="p-3 text-center">Action</th>
+          <th class="p-3 text-center" colspan="2">Action</th>
         </tr>
       </thead>
 
@@ -79,6 +104,7 @@ onMounted(() => {
           <td class="p-3">{{ doc.description }}</td>
           <td class="p-3">{{ doc.uploaded_by }}</td>
           <td class="p-3">{{ doc.uploaded_at }}</td>
+
           <td class="p-3 text-center">
             <button
               @click="downloadFile(doc.filename)"
@@ -87,11 +113,23 @@ onMounted(() => {
               Download
             </button>
           </td>
+
+          <td class="p-3 text-center">
+            <!-- FIXED ROLE CHECK -->
+            <button
+              v-if="role === 'Admin'"
+              @click="deleteDocument(doc.id)"
+              class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>
 
-    <div v-if="!loading && filteredDocuments().length === 0" class="text-gray-600 text-center mt-4">
+    <div v-if="!loading && filteredDocuments().length === 0"
+         class="text-gray-600 text-center mt-4">
       No documents found.
     </div>
   </div>
