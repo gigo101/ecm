@@ -58,22 +58,6 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # --- USER MODEL ---
-# class User(Base):
-#     __tablename__ = "users"
-#     id = Column(Integer, primary_key=True, index=True)
-#     email = Column(String(255), unique=True, index=True)
-#     password = Column(String(255))
-
-# class User(Base):
-#     __tablename__ = "users"
-#     id = Column(Integer, primary_key=True, index=True)
-#     email = Column(String(255), unique=True, index=True)
-#     name = Column(String(255), default="User")
-#     role = Column(String(50), default="User")   # “Admin”, “Staff”, etc.
-#     password = Column(String(255))
-#     created_at = Column(DateTime, default=datetime.utcnow)
-
-
 class User(Base):
     __tablename__ = "users"
 
@@ -91,8 +75,6 @@ class User(Base):
 
     role = Column(String(50), default="User")
     created_at = Column(DateTime, default=datetime.utcnow)
-
-
 
 
 # --- DOCUMENT MODEL ---
@@ -115,9 +97,6 @@ class Token(BaseModel):
     token_type: str
 
 # Request body for registration
-# class UserCreate(BaseModel):
-#     email: str
-#     password: str
 
 class UserCreate(BaseModel):
     first_name: str
@@ -140,24 +119,6 @@ def get_db():
 
 
 # Register API
-# @app.post("/auth/register")
-# async def register_user(user: UserCreate, db: Session = Depends(get_db)):
-#     # Check for duplicates
-#     existing = db.query(User).filter(User.email == user.email).first()
-#     if existing:
-#         raise HTTPException(status_code=400, detail="Email already registered")
-
-#     # Hash password
-#     hashed_pw = hash_password(user.password)
-
-#     # Insert new user
-#     new_user = User(email=user.email, password=hashed_pw)
-#     db.add(new_user)
-#     db.commit()
-#     db.refresh(new_user)
-
-#     return {"message": "User registered successfully"}
-
 @app.post("/auth/register")
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
@@ -209,27 +170,6 @@ async def login(
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"access_token": token, "token_type": "bearer"}
-
-# --- PROTECTED ROUTE ---
-# @app.get("/users/me")
-# async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-#     try:
-#         data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-#         email = data["sub"]
-#     except:
-#         raise HTTPException(status_code=401, detail="Invalid token")
-
-#     user = db.query(User).filter(User.email == email).first()
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
-
-#     # return user
-
-#     return {
-#         "email": user.email,
-#         "name": user.name,
-#         "role": user.role
-#     }
 
 # Protected Route
 @app.get("/users/me")
@@ -486,12 +426,20 @@ async def delete_user(
     return {"message": "User deleted"}
 
 #user update model
+# class UserUpdate(BaseModel):
+#     name: str
+#     email: str
+#     role: str
+
 class UserUpdate(BaseModel):
-    name: str
+    first_name: str
+    middle_name: str | None = None
+    last_name: str
     email: str
     role: str
 
 
+#Update User
 @app.put("/users/{user_id}")
 async def update_user(
     user_id: int,
@@ -505,9 +453,12 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user.name = user_data.name
+    user.first_name = user_data.first_name
+    user.middle_name = user_data.middle_name
+    user.last_name = user_data.last_name
     user.email = user_data.email
     user.role = user_data.role
+
     db.commit()
     db.refresh(user)
 

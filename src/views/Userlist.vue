@@ -215,6 +215,7 @@ async function updateRole() {
     });
     showRoleModal.value = false;
     loadUsers();
+    alert("User role updated successfully.");
   } catch {
     alert("Failed to update role.");
   }
@@ -244,6 +245,7 @@ async function saveUserChanges() {
   await api.put(`/users/${editUser.value.id}`, editUser.value);
   showEditModal.value = false;
   loadUsers();
+  alert("User updated successfully.");
 }
 
 async function savePasswordChange() {

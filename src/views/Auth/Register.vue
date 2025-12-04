@@ -5,12 +5,17 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 
+const step = ref(1); // MULTI-STEP CONTROL
+
+// FORM FIELDS
 const first_name = ref("");
 const middle_name = ref("");
 const last_name = ref("");
 const suffix = ref("");
+
 const position = ref("");
 const office = ref("");
+
 const email = ref("");
 const password = ref("");
 const confirmPassword = ref("");
@@ -18,6 +23,32 @@ const confirmPassword = ref("");
 const loading = ref(false);
 const error = ref("");
 const success = ref("");
+
+// GO TO NEXT STEP WITH SIMPLE VALIDATION
+function nextStep() {
+  error.value = "";
+
+  if (step.value === 1) {
+    if (!first_name.value || !last_name.value) {
+      error.value = "Please enter all required personal details.";
+      return;
+    }
+  }
+
+  if (step.value === 2) {
+    if (!position.value || !office.value) {
+      error.value = "Please provide your position and office.";
+      return;
+    }
+  }
+
+  step.value++;
+}
+
+function previousStep() {
+  error.value = "";
+  step.value--;
+}
 
 async function handleRegister() {
   error.value = "";
@@ -43,7 +74,6 @@ async function handleRegister() {
     });
 
     success.value = "Account successfully created!";
-    
     setTimeout(() => router.push("/login"), 2000);
 
   } catch (err) {
@@ -54,6 +84,7 @@ async function handleRegister() {
 }
 </script>
 
+
 <template>
   <div
     class="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-900 via-green-800 to-green-700 bg-cover bg-center"
@@ -61,77 +92,143 @@ async function handleRegister() {
   >
     <div class="bg-white/80 backdrop-blur-lg p-10 rounded-3xl shadow-2xl w-full max-w-md">
 
-      <h2 class="text-3xl font-extrabold text-green-800 text-center mb-6">Create Account</h2>
+      <!-- STEP INDICATOR -->
+      <div class="flex justify-center mb-6">
+        <div class="flex gap-3">
+          <div :class="['w-3 h-3 rounded-full', step === 1 ? 'bg-green-700' : 'bg-gray-400']"></div>
+          <div :class="['w-3 h-3 rounded-full', step === 2 ? 'bg-green-700' : 'bg-gray-400']"></div>
+          <div :class="['w-3 h-3 rounded-full', step === 3 ? 'bg-green-700' : 'bg-gray-400']"></div>
+        </div>
+      </div>
+
+      <h2 class="text-3xl font-extrabold text-green-800 text-center mb-6">
+        Create Account
+      </h2>
 
       <form @submit.prevent="handleRegister" class="space-y-4">
 
-        <!-- First Name -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">First Name</label>
-          <input v-model="first_name" required class="w-full p-3 border rounded-lg" />
+        <!-- STEP 1: PERSONAL INFO -->
+        <div v-if="step === 1" class="space-y-4">
+          <h3 class="text-lg font-semibold text-green-700">Personal Information</h3>
+
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">First Name</label>
+            <input v-model="first_name" required class="w-full p-3 border rounded-lg" />
+          </div>
+
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">Middle Name</label>
+            <input v-model="middle_name" class="w-full p-3 border rounded-lg" />
+          </div>
+
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">Last Name</label>
+            <input v-model="last_name" required class="w-full p-3 border rounded-lg" />
+          </div>
+
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">Suffix (optional)</label>
+            <input v-model="suffix" class="w-full p-3 border rounded-lg" />
+          </div>
+
+          <button type="button" @click="nextStep" class="w-full bg-green-700 hover:bg-green-800 text-white p-3 rounded-lg">
+            Next →
+          </button>
         </div>
 
-         <!-- Middle Name -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">Middle Name</label>
-          <input v-model="middle_name" required class="w-full p-3 border rounded-lg" />
-        </div>
+        <!-- STEP 2: WORK INFO -->
+        <!-- STEP 2: WORK INFO -->
+        <div v-if="step === 2" class="space-y-4">
+          <h3 class="text-lg font-semibold text-green-700">Work Information</h3>
 
-        <!-- Last Name -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">Last Name</label>
-          <input v-model="last_name" required class="w-full p-3 border rounded-lg" />
-        </div>
+          <!-- Position Dropdown -->
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">Position</label>
+            <select
+              v-model="position"
+              required
+              class="w-full p-3 border rounded-lg"
+            >
+              <option disabled value="">Select Position</option>
+              <option>Instructor I</option>
+              <option>Information Officer III</option>
+              <option>IT Officer I</option>
+              <option>Planning Officer I</option>
+              <option>Librarian III</option>
+            </select>
+          </div>
 
-        <!-- Suffix -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">Suffix (optional)</label>
-          <input v-model="suffix" placeholder="Jr., III, etc." class="w-full p-3 border rounded-lg" />
-        </div>
+          <!-- Office Dropdown -->
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">Office</label>
+            <select
+              v-model="office"
+              required
+              class="w-full p-3 border rounded-lg"
+            >
+              <option disabled value="">Select Office</option>
+              <option>Technology Support Services Unit</option>
+              <option>Registrar's Office</option>
+              <option>Public Information Office</option>
+              <option>PRMO</option>
+              <option>Library</option>
+            </select>
+          </div>
 
-        <!-- Position -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">Position</label>
-          <input v-model="position" required class="w-full p-3 border rounded-lg" />
-        </div>
+  <div class="flex justify-between">
+    <button
+      type="button"
+      @click="previousStep"
+      class="px-5 py-2 bg-gray-400 rounded text-white"
+    >
+      ← Back
+    </button>
 
-        <!-- Office -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">Office</label>
-          <input v-model="office" required class="w-full p-3 border rounded-lg" />
-        </div>
+    <button
+      type="button"
+      @click="nextStep"
+      class="px-5 py-2 bg-green-700 text-white rounded"
+    >
+      Next →
+    </button>
+  </div>
+</div>
 
-        <!-- Email -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">Email</label>
-          <input type="email" v-model="email" required class="w-full p-3 border rounded-lg" />
-        </div>
 
-        <!-- Password -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">Password</label>
-          <input type="password" v-model="password" required class="w-full p-3 border rounded-lg" />
-        </div>
+        <!-- STEP 3: ACCOUNT INFO -->
+        <div v-if="step === 3" class="space-y-4">
+          <h3 class="text-lg font-semibold text-green-700">Account Credentials</h3>
 
-        <!-- Confirm Password -->
-        <div>
-          <label class="block text-gray-700 mb-1 text-sm">Confirm Password</label>
-          <input type="password" v-model="confirmPassword" required class="w-full p-3 border rounded-lg" />
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">Email</label>
+            <input type="email" v-model="email" required class="w-full p-3 border rounded-lg" />
+          </div>
+
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">Password</label>
+            <input type="password" v-model="password" required class="w-full p-3 border rounded-lg" />
+          </div>
+
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm">Confirm Password</label>
+            <input type="password" v-model="confirmPassword" required class="w-full p-3 border rounded-lg" />
+          </div>
+
+          <div class="flex justify-between">
+            <button type="button" @click="previousStep" class="px-5 py-2 bg-gray-400 rounded text-white">
+              ← Back
+            </button>
+
+            <button type="submit" :disabled="loading" class="px-5 py-2 bg-green-700 hover:bg-green-800 text-white rounded">
+              <span v-if="!loading">Register</span>
+              <span v-else>Creating...</span>
+            </button>
+          </div>
         </div>
 
         <!-- Error / Success -->
         <div v-if="error" class="text-red-600 text-center text-sm">{{ error }}</div>
         <div v-if="success" class="text-green-700 text-center text-sm font-semibold">{{ success }}</div>
-
-        <!-- Button -->
-        <button
-          type="submit"
-          :disabled="loading"
-          class="w-full bg-green-700 hover:bg-green-800 text-white p-3 rounded-lg shadow"
-        >
-          <span v-if="!loading">Register</span>
-          <span v-else>Creating Account...</span>
-        </button>
 
       </form>
 

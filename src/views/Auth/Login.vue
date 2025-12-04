@@ -4,8 +4,8 @@ import api from "@/api";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-const email = ref("admin@example.com"); // prefill for testing
-const password = ref("admin123");       // prefill for testing
+const email = ref(""); // prefill for testing
+const password = ref("");       // prefill for testing
 const loading = ref(false);
 const error = ref("");
 
@@ -92,7 +92,7 @@ async function handleLogin() {
           <input
             v-model="email"
             type="email"
-            placeholder="admin@example.com"
+            placeholder="email@example.com"
             required
             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition"
           />
