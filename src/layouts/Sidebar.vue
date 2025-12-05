@@ -18,7 +18,6 @@ const role = ref(localStorage.getItem("role"));
         <router-link to="/documents" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">Documents</router-link>
         <router-link to="/search" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">Search</router-link>
         <router-link to="/chat" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">Chatbot</router-link>
-        <router-link to="/admin/users" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">Admin</router-link>
         <!-- User Management (Admin only) -->
       <router-link
         v-if="role === 'Admin'"

@@ -85,6 +85,7 @@ class Document(Base):
     filename = Column(String(255))
     filepath = Column(String(500))
     description = Column(Text)
+    category = Column(String(100), default="General")   # NEW CATEGORY FIELD
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
@@ -154,6 +155,7 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 
 # --- LOGIN ---
+
 @app.post("/auth/login", response_model=Token)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -244,11 +246,12 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def upload_document(
     file: UploadFile = File(...),
     description: str = Form(""),
+      category: str = Form("General"),
     current_user = Depends(get_current_user),  # already authenticated user
     db: Session = Depends(get_db)
 ):
     # Role check
-    require_role(["Admin", "Staff"])(current_user)
+    require_role(["Admin", "Uploader"])(current_user)
 
     # Save file
     file_location = f"{UPLOAD_DIR}/{file.filename}"
@@ -260,6 +263,7 @@ async def upload_document(
         filename=file.filename,
         filepath=file_location,
         description=description,
+        category=category,   # SAVE CATEGORY
         uploaded_by=current_user.email,   # simple & correct
     )
 

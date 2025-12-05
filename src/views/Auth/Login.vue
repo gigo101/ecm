@@ -31,7 +31,7 @@ async function handleLogin() {
     localStorage.setItem("role", user.data.role);
     localStorage.setItem("name", user.data.name);
 
-    router.push("/documents");
+    router.push("/dashboard");
 
   } catch (err) {
     console.error("Login error:", err);

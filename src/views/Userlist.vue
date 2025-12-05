@@ -184,6 +184,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import api from "@/api";
+import { useToast } from "vue-toastification";
 
 const users = ref([]);
 const loading = ref(true);
@@ -239,9 +240,9 @@ async function updateRole() {
     });
     showRoleModal.value = false;
     loadUsers();
-    alert("User role updated successfully.");
+    toast.success("User role updated successfully.");
   } catch {
-    alert("Failed to update role.");
+    toast.error("Failed to update role.");
   }
 }
 
@@ -269,7 +270,7 @@ async function saveUserChanges() {
   await api.put(`/users/${editUser.value.id}`, editUser.value);
   showEditModal.value = false;
   loadUsers();
-  alert("User updated successfully.");
+  toast.success("User updated successfully.");
 }
 
 async function savePasswordChange() {
@@ -281,7 +282,7 @@ async function savePasswordChange() {
 }
 
 
- async function toggleStatus(user) {
+async function toggleStatus(user) {
   try {
     const newStatus = !user.is_active;
 
@@ -289,11 +290,21 @@ async function savePasswordChange() {
       is_active: newStatus
     });
 
-    user.is_active = newStatus; // Update UI optimistically
+    // Update UI
+    user.is_active = newStatus;
+
+    // Toast notification
+    toast.success(`User has been ${newStatus ? "activated" : "deactivated"} successfully.`);
+    
   } catch (err) {
-    alert("Failed to update user status.");
+    toast.error("Failed to update user status.");
   }
 }
+
+
+
+const toast = useToast();
+
 
 onMounted(loadUsers);
 </script>

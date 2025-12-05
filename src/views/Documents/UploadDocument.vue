@@ -4,6 +4,7 @@ import api from "@/api";
 
 const selectedFile = ref(null);
 const description = ref("");
+const category = ref("General");
 const success = ref("");
 const error = ref("");
 const loading = ref(false);
@@ -24,6 +25,7 @@ async function uploadDocument() {
   const formData = new FormData();
   formData.append("file", selectedFile.value);
   formData.append("description", description.value);
+  formData.append("category", category.value);
 
   loading.value = true;
 
@@ -56,6 +58,19 @@ async function uploadDocument() {
         placeholder="Add a description (optional)"
         class="w-full p-3 border rounded-lg"
       ></textarea>
+      <label class="text-sm font-medium text-gray-700">Category</label>
+      <select
+        v-model="category"
+        placeholder="Select Category"
+        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+      >
+        <option>General</option>
+        <option>Administrative</option>
+        <option>Finance</option>
+        <option>HR</option>
+        <option>Procurement</option>
+        <option>Research</option>
+      </select>
 
       <button
         @click="uploadDocument"

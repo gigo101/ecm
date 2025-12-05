@@ -64,7 +64,7 @@ onMounted(() => {
   <div class="p-8">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-xl font-semibold text-dns_dark">Documents</h1>
-      <router-link v-if="role==='Admin'"
+      <router-link v-if="role==='Admin' || role==='Uploader'"
         to="/documents/upload"
         class="px-4 py-2 bg-dns_dark text-white rounded"
       >
@@ -88,6 +88,7 @@ onMounted(() => {
         <tr>
           <th class="p-3 text-left">Filename</th>
           <th class="p-3 text-left">Description</th>
+          <th class="p-3 text-left">Category</th>
           <th class="p-3 text-left">Uploaded By</th>
           <th class="p-3 text-left">Date</th>
           <th class="p-3 text-center" colspan="2">Action</th>
@@ -102,6 +103,7 @@ onMounted(() => {
         >
           <td class="p-3">{{ doc.filename }}</td>
           <td class="p-3">{{ doc.description }}</td>
+          <td class="p-3">{{ doc.category }}</td>
           <td class="p-3">{{ doc.uploaded_by }}</td>
           <td class="p-3">{{ doc.uploaded_at }}</td>
 
