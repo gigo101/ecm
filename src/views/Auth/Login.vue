@@ -9,40 +9,12 @@ const password = ref("");       // prefill for testing
 const loading = ref(false);
 const error = ref("");
 
-// async function handleLogin() {
-//   try {
-//     loading.value = true;
-//     error.value = "";
-
-//     // FastAPI expects "application/x-www-form-urlencoded"
-//     const res = await api.post(
-//       "/auth/login",
-//       new URLSearchParams({
-//         username: email.value,
-//         password: password.value,
-//       }),
-//       {
-//         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-//       }
-//     );
-
-//     const token = res.data.access_token;
-//     localStorage.setItem("token", token);
-//     router.push("/dashboard");
-//   } catch (err) {
-//     console.error("Login failed:", err);
-//     if (err.response && err.response.data && err.response.data.detail) {
-//       error.value = err.response.data.detail;
-//     } else {
-//       error.value = "Invalid email or password";
-//     }
-//   } finally {
-//     loading.value = false;
-//   }
-// }
 
 async function handleLogin() {
   try {
+    loading.value = true;
+    error.value = "";
+
     const data = new URLSearchParams();
     data.append("username", email.value);
     data.append("password", password.value);
@@ -54,16 +26,29 @@ async function handleLogin() {
     const token = response.data.access_token;
     localStorage.setItem("token", token);
 
-    // FETCH USER PROFILE HERE
+    // FETCH USER PROFILE
     const user = await api.get("/users/me");
     localStorage.setItem("role", user.data.role);
     localStorage.setItem("name", user.data.name);
 
     router.push("/documents");
+
   } catch (err) {
-    error.value = "Login failed.";
+    console.error("Login error:", err);
+
+    const backendMessage = err.response?.data?.detail;
+
+    if (backendMessage) {
+      error.value = backendMessage;
+    } else {
+      error.value = "Login failed.";
+    }
+
+  } finally {
+    loading.value = false;
   }
 }
+
 
 </script>
 

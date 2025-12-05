@@ -22,6 +22,8 @@
       <th class="p-3 text-center hidden md:table-cell">Password</th>
       <th class="p-3 text-center hidden md:table-cell">Role</th>
       <th class="p-3 text-center hidden md:table-cell">Delete</th>
+      <th class="p-3 text-left">Status</th>
+
 
       <!-- Mobile dropdown -->
       <th class="p-3 text-center md:hidden">Actions</th>
@@ -77,6 +79,28 @@
           🗑️
         </button>
       </td>
+
+      <td class="p-3">
+
+  <!-- Toggle Switch -->
+  <label class="inline-flex items-center cursor-pointer">
+    <input
+      type="checkbox"
+      class="sr-only peer"
+      :checked="u.is_active"
+      @change="toggleStatus(u)"
+    />
+    <div
+      class="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-green-600 relative transition"
+    >
+      <div
+        class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition
+               peer-checked:translate-x-5"
+      ></div>
+    </div>
+  </label>
+
+</td>
 
       <!-- Mobile dropdown -->
       <td class="p-3 md:hidden text-center">
@@ -165,7 +189,7 @@ const users = ref([]);
 const loading = ref(true);
 const error = ref("");
 
-const roles = ["Admin", "Staff", "Viewer"];
+const roles = ["Admin", "Uploader", "Faculty", "Staff", "Viewer"];
 
 const showRoleModal = ref(false);
 const selectedUser = ref(null);
@@ -254,6 +278,21 @@ async function savePasswordChange() {
     new_password: passwordForm.value.new_password,
   });
   showPasswordModal.value = false;
+}
+
+
+ async function toggleStatus(user) {
+  try {
+    const newStatus = !user.is_active;
+
+    await api.put(`/users/${user.id}/status`, {
+      is_active: newStatus
+    });
+
+    user.is_active = newStatus; // Update UI optimistically
+  } catch (err) {
+    alert("Failed to update user status.");
+  }
 }
 
 onMounted(loadUsers);

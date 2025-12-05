@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from fastapi.middleware.cors import CORSMiddleware
 import jwt
@@ -28,7 +28,6 @@ def require_role(required_roles: list):
         if user.role not in required_roles:
             raise HTTPException(status_code=403, detail="Access denied")
     return role_checker
-
 
 
 # --- FASTAPI APP ---
@@ -74,6 +73,7 @@ class User(Base):
     password = Column(String(255))
 
     role = Column(String(50), default="User")
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -108,6 +108,8 @@ class UserCreate(BaseModel):
     email: str
     password: str
 
+class UserStatusUpdate(BaseModel):
+    is_active: bool
 
 # --- DB DEPENDENCY ---
 def get_db():
@@ -116,6 +118,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 
 # Register API
@@ -159,10 +162,19 @@ async def login(
     # Find user
     user = db.query(User).filter(User.email == form_data.username).first()
 
-    # Compare plain text password (for now)
-    #if not user or user.password != form_data.password:
-    if not user or not verify_password(form_data.password, user.password):
+    # If user does not exist
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid username or password")
 
+    # Block inactive users
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been deactivated. Please contact the administrator."
+        )
+
+    # Password check
+    if not verify_password(form_data.password, user.password):
         raise HTTPException(status_code=400, detail="Invalid username or password")
 
     # Create token
@@ -170,6 +182,7 @@ async def login(
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"access_token": token, "token_type": "bearer"}
+
 
 # Protected Route
 @app.get("/users/me")
@@ -381,6 +394,7 @@ async def list_users(
             "middle_name": u.middle_name,
             "last_name": u.last_name,
             "role": u.role,
+            "is_active": u.is_active,
             "created_at": u.created_at,
         }
         for u in users
@@ -492,3 +506,22 @@ async def change_password(
     db.commit()
 
     return {"message": "Password updated successfully"}
+
+#Update User Status
+@app.put("/users/{user_id}/status")
+async def update_user_status(
+    user_id: int,
+    status: UserStatusUpdate,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    user.is_active = status.is_active
+    db.commit()
+
+    return {"message": "Status updated"}
