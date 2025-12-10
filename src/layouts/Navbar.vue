@@ -15,7 +15,7 @@
         :aria-expanded="showMenu.toString()"
       >
         <i class="pi pi-user text-dns_dark text-lg"></i>
-        <span class="text-sm text-dns_dark font-medium">Account</span>
+        <span class="text-sm text-dns_dark font-medium">Hello, {{ userName }}</span>
 
         <svg
           class="w-4 h-4 text-dns_dark"
@@ -67,6 +67,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import api from "@/api"; // ✅ Your axios instance
 
 const router = useRouter();
 const route = useRoute();
@@ -74,6 +75,9 @@ const route = useRoute();
 const showMenu = ref(false);
 const containerRef = ref(null);
 const menuRef = ref(null);
+
+// ✅ USER NAME
+const userName = ref("Account");
 
 function toggleMenu() {
   showMenu.value = !showMenu.value;
@@ -87,6 +91,17 @@ function handleLogout() {
   localStorage.removeItem("token");
   closeMenu();
   router.push("/login");
+}
+
+// ✅ FETCH LOGGED-IN USER
+async function fetchUser() {
+  try {
+    const res = await api.get("/users/me"); // ✅ Your FastAPI endpoint
+    userName.value = res.data.first_name;         // ✅ Uses "name" from backend
+  } catch (err) {
+    console.error("Failed to load user:", err);
+    userName.value = "Account";
+  }
 }
 
 // Close when clicking outside
@@ -104,6 +119,7 @@ function onKeyDown(e) {
 }
 
 onMounted(() => {
+  fetchUser(); // ✅ LOAD USER NAME ON PAGE LOAD
   document.addEventListener("click", onDocumentClick);
   document.addEventListener("keydown", onKeyDown);
 });
@@ -117,10 +133,9 @@ onBeforeUnmount(() => {
 // close dropdown when navigating to another route
 watch(
   () => route.fullPath,
-  () => {
-    closeMenu();
-  }
+  () => closeMenu()
 );
+
 </script>
 
 <style scoped>
@@ -133,4 +148,6 @@ watch(
 .fade-leave-to {
   opacity: 0;
 }
+
+
 </style>

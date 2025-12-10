@@ -11,6 +11,8 @@ from passlib.context import CryptContext
 import os
 from fastapi import UploadFile, File, Form
 from fastapi.responses import JSONResponse
+from nlp_utils import extract_text_from_file, classify_document
+
 
 
 # pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -73,7 +75,7 @@ class User(Base):
     password = Column(String(255))
 
     role = Column(String(50), default="User")
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -88,7 +90,7 @@ class Document(Base):
     category = Column(String(100), default="General")   # NEW CATEGORY FIELD
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
-
+    document_type = Column(String(50), default="Public")  # NEW FIELD
 
 Base.metadata.create_all(bind=engine)
 
@@ -246,27 +248,35 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def upload_document(
     file: UploadFile = File(...),
     description: str = Form(""),
-      category: str = Form("General"),
-    current_user = Depends(get_current_user),  # already authenticated user
+    category: str = Form("General"),
+    document_type: str = Form("Public"),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Role check
     require_role(["Admin", "Uploader"])(current_user)
 
-    # Save file
+    # Save file temporarily to extract its text
     file_location = f"{UPLOAD_DIR}/{file.filename}"
     with open(file_location, "wb+") as f:
         f.write(await file.read())
 
-    # Save to database
+    # NLP Classification
+    if category == "Auto":
+        file_text = extract_text_from_file(file_location)
+        combined_text = f"{description}\n{file_text}"
+
+        category = classify_document(combined_text)
+        print("AUTO CATEGORY:", category)
+
+    # Save document record
     document = Document(
         filename=file.filename,
         filepath=file_location,
         description=description,
-        category=category,   # SAVE CATEGORY
-        uploaded_by=current_user.email,   # simple & correct
+        category=category,
+        document_type=document_type,
+        uploaded_by=current_user.email
     )
-
 
     db.add(document)
     db.commit()
@@ -274,8 +284,9 @@ async def upload_document(
 
     return {
         "message": "File uploaded successfully",
-        "document_id": document.id
+        "auto_category": category
     }
+
 
 
 
@@ -298,6 +309,8 @@ async def list_documents(
             "id": d.id,
             "filename": d.filename,
             "description": d.description,
+            "category": d.category,
+            "document_type": d.document_type,
             "uploaded_by": d.uploaded_by,
             "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M")
         }
@@ -529,3 +542,5 @@ async def update_user_status(
     db.commit()
 
     return {"message": "Status updated"}
+
+

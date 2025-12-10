@@ -87,8 +87,9 @@ onMounted(() => {
       <thead class="bg-green-700 text-white">
         <tr>
           <th class="p-3 text-left">Filename</th>
-          <th class="p-3 text-left">Description</th>
+          <!-- <th class="p-3 text-left">Description</th> -->
           <th class="p-3 text-left">Category</th>
+          <th class="p-3 text-left">Type</th>
           <th class="p-3 text-left">Uploaded By</th>
           <th class="p-3 text-left">Date</th>
           <th class="p-3 text-center" colspan="2">Action</th>
@@ -102,17 +103,31 @@ onMounted(() => {
           class="border-b hover:bg-gray-100"
         >
           <td class="p-3">{{ doc.filename }}</td>
-          <td class="p-3">{{ doc.description }}</td>
+          <!-- <td class="p-3">{{ doc.description }}</td> -->
           <td class="p-3">{{ doc.category }}</td>
+          <td class="p-3 font-semibold">
+          <span v-if="doc.document_type === 'Confidential'" class="text-red-600">
+            {{ doc.document_type }}
+          </span>
+          <span v-else class="text-green-700">
+            {{ doc.document_type }}
+          </span>
+</td>
           <td class="p-3">{{ doc.uploaded_by }}</td>
           <td class="p-3">{{ doc.uploaded_at }}</td>
 
           <td class="p-3 text-center">
-            <button
+            <button v-if="role==='Admin' || role==='Uploader'"
               @click="downloadFile(doc.filename)"
               class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
             >
               Download
+            </button>
+            <button v-if="role==='Viewer'"
+              @click="downloadFile(doc.filename)"
+              class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              View
             </button>
           </td>
 

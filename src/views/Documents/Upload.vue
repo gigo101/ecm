@@ -16,6 +16,7 @@
         fd.append('file', file.value)
         await axios.post('http://localhost:8000/upload', fd)
         alert('Uploaded')
+
     }
 </script>
 
