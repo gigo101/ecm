@@ -452,27 +452,33 @@ async def delete_document(
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Only ADMIN can delete documents
-    require_role(["Admin"])(current_user)
-
     document = db.query(Document).filter(Document.id == doc_id).first()
 
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Delete file from disk
-    try:
-        import os
-        if os.path.exists(document.filepath):
-            os.remove(document.filepath)
-    except Exception as e:
-        print("File delete error:", e)
+    # ✅ ADMIN can delete any document
+    if current_user.role == "Admin":
+        pass
 
-    # Delete DB record
+    # ✅ UPLOADER can delete ONLY their own uploads
+    elif current_user.role == "Uploader":
+        if document.uploaded_by != current_user.email:
+            raise HTTPException(status_code=403, detail="You can only delete your own uploads")
+
+    # ❌ Everyone else cannot delete
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Delete file from disk
+    if os.path.exists(document.filepath):
+        os.remove(document.filepath)
+
     db.delete(document)
     db.commit()
 
     return {"message": "Document deleted successfully"}
+
 
 #Get all users - Admin only
 @app.get("/users")
@@ -814,7 +820,8 @@ async def my_uploads(
     current_user = Depends(get_current_user)
 ):
     # Only Admin & Uploader can access
-    require_role(["Admin", "Uploader"])(current_user)
+    if current_user.role not in ["Admin", "Uploader"]:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     docs = (
         db.query(Document)
@@ -835,3 +842,4 @@ async def my_uploads(
         }
         for d in docs
     ]
+

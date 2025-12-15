@@ -41,11 +41,14 @@ function switchTab(tab) {
 // Search filter
 function filteredDocuments() {
   if (!search.value) return documents.value;
+
   return documents.value.filter(d =>
     d.filename.toLowerCase().includes(search.value.toLowerCase()) ||
     d.description?.toLowerCase().includes(search.value.toLowerCase())
   );
 }
+
+
 
 // Download
 function downloadFile(filename) {
@@ -105,16 +108,16 @@ onMounted(() => {
   </button>
 
   <!-- Admin & Uploader only -->
-  <button
-    v-if="role === 'Admin' || role === 'Uploader'"
-    @click="switchTab('mine')"
-    :class="activeTab === 'mine'
-      ? 'bg-green-700 text-white'
-      : 'bg-gray-200 text-gray-700'"
-    class="px-4 py-2 rounded"
-  >
-    My Uploads
-  </button>
+<button
+  @click="switchTab('mine')"
+  :class="activeTab === 'mine'
+    ? 'bg-green-700 text-white'
+    : 'bg-gray-200'"
+  class="px-4 py-2 rounded"
+>
+  My Uploads
+</button>
+
 </div>
 
     <!-- Search bar -->
@@ -162,24 +165,30 @@ onMounted(() => {
           <td class="p-3">{{ doc.uploaded_at }}</td>
 
           <td class="p-3 text-center">
-            <button v-if="role==='Admin' || role==='Uploader' || role==='Faculty' || role==='Staff' || role==='Management'"
-              @click="downloadFile(doc.filename)"
-              class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              Download
-            </button>
-            <button v-if="role==='Viewer'"
-              @click="openPreview(doc.id)"
-              class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-              View
-            </button>
-          </td>
+            <div class="flex justify-center gap-2">
+              <!-- View -->
+              <button
+                v-if="role==='Viewer' || role==='Faculty' || role==='Staff' || role==='Management'"
+                @click="openPreview(doc.id)"
+                class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              >
+                View
+              </button>
 
+              <!-- Download -->
+              <button
+                v-if="role==='Admin' || role==='Uploader' || role==='Faculty' || role==='Staff' || role==='Management'"
+                @click="downloadFile(doc.filename)"
+                class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              >
+                Download
+              </button>
+            </div>
+          </td>
           <td class="p-3 text-center">
             <!-- FIXED ROLE CHECK -->
             <button
-              v-if="role === 'Admin' || role === 'Uploader'"
+              v-if="role === 'Admin' || (role === 'Uploader' && activeTab=== 'mine')")
               @click="deleteDocument(doc.id)"
               class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
             >
