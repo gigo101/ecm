@@ -15,6 +15,9 @@ import DocumentList from '@/views/Documents/DocumentList.vue'
 import ChangePassword from '@/views/Auth/ChangePassword.vue'
 import Profile from '@/views/Profile.vue'
 import Userlist from '@/views/Userlist.vue'
+import Positions from '@/views/Admin/Positions.vue'
+import Offices from '@/views/Admin/Offices.vue'
+
 
 const routes = [
 { 
@@ -83,6 +86,16 @@ const routes = [
   path: "/users",
   component: Userlist,
   meta: { requiresAuth: true, requiresAdmin: true }
+},
+{
+  path: "/admin/positions",
+  component: Positions,
+  meta: { requiresAuth: true, role: "Admin" }
+},
+{
+  path: "/admin/offices",
+  component: Offices,
+  meta: { requiresAuth: true, role: "Admin" }
 },
 { 
     path: '/:catchAll(.*)', 

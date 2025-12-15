@@ -12,6 +12,7 @@ import os
 from fastapi import UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from nlp_utils import extract_text_from_file, classify_document
+from fastapi.responses import FileResponse
 
 
 
@@ -42,6 +43,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"]
 )
 
 # OAuth2 AFTER CORS
@@ -74,7 +76,7 @@ class User(Base):
     email = Column(String(255), unique=True, index=True)
     password = Column(String(255))
 
-    role = Column(String(50), default="User")
+    role = Column(String(50), default="Viewer")
     is_active = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -114,6 +116,21 @@ class UserCreate(BaseModel):
 class UserStatusUpdate(BaseModel):
     is_active: bool
 
+class Position(Base):
+    __tablename__ = "positions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False)
+
+
+class Office(Base):
+    __tablename__ = "offices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    office_code = Column(String(50), unique=True, nullable=False, index=True)
+    name = Column(String(255), unique=True, nullable=False)
+
+
 # --- DB DEPENDENCY ---
 def get_db():
     db = SessionLocal()
@@ -146,7 +163,7 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
         office=user.office,
         email=user.email,
         password=hashed_pw,
-        role="User",
+        role="Viewer",  # Default role
     )
 
     db.add(new_user)
@@ -244,6 +261,52 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+# @app.post("/documents/upload")
+# async def upload_document(
+#     file: UploadFile = File(...),
+#     description: str = Form(""),
+#     category: str = Form("General"),
+#     document_type: str = Form("Public"),
+#     current_user = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     require_role(["Admin", "Uploader"])(current_user)
+
+#     # Save file temporarily to extract its text
+#     file_location = f"{UPLOAD_DIR}/{file.filename}"
+#     with open(file_location, "wb+") as f:
+#         f.write(await file.read())
+
+#     # NLP Classification
+#     if category == "Auto":
+#         file_text = extract_text_from_file(file_location)
+#         combined_text = f"{description}\n{file_text}"
+
+#         category = classify_document(combined_text)
+#         print("AUTO CATEGORY:", category)
+
+#     # Save document record
+#     document = Document(
+#         filename=file.filename,
+#         filepath=file_location,
+#         description=description,
+#         category=category,
+#         document_type=document_type,
+#         uploaded_by=current_user.email
+#     )
+
+#     db.add(document)
+#     db.commit()
+#     db.refresh(document)
+
+#     return {
+#         "message": "File uploaded successfully",
+#         "auto_category": category
+#     }
+
+from pathlib import Path
+import re
+
 @app.post("/documents/upload")
 async def upload_document(
     file: UploadFile = File(...),
@@ -255,22 +318,33 @@ async def upload_document(
 ):
     require_role(["Admin", "Uploader"])(current_user)
 
-    # Save file temporarily to extract its text
-    file_location = f"{UPLOAD_DIR}/{file.filename}"
+    # ✅ 1. Get user's office
+    user_office = current_user.office or "UNKNOWN"
+
+    # ✅ 2. Sanitize office (safe for filenames)
+    safe_office = re.sub(r"[^A-Za-z0-9]", "_", user_office).upper()
+
+    # ✅ 3. Get original filename safely
+    original_name = Path(file.filename).name
+
+    # ✅ 4. Build new filename
+    new_filename = f"{safe_office}_{original_name}"
+
+    # ✅ 5. Save file using new filename
+    file_location = os.path.join(UPLOAD_DIR, new_filename)
+
     with open(file_location, "wb+") as f:
         f.write(await file.read())
 
-    # NLP Classification
+    # NLP auto classification
     if category == "Auto":
         file_text = extract_text_from_file(file_location)
         combined_text = f"{description}\n{file_text}"
-
         category = classify_document(combined_text)
-        print("AUTO CATEGORY:", category)
 
-    # Save document record
+    # ✅ 6. Save document record with updated filename
     document = Document(
-        filename=file.filename,
+        filename=new_filename,
         filepath=file_location,
         description=description,
         category=category,
@@ -284,6 +358,7 @@ async def upload_document(
 
     return {
         "message": "File uploaded successfully",
+        "filename": new_filename,
         "auto_category": category
     }
 
@@ -294,15 +369,19 @@ async def upload_document(
 @app.get("/documents/list")
 async def list_documents(
     db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    current_user = Depends(get_current_user)
 ):
-    # Verify user token
-    try:
-        user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    query = db.query(Document)
 
-    docs = db.query(Document).order_by(Document.uploaded_at.desc()).all()
+    if current_user.role == "Viewer":
+        query = query.filter(Document.document_type == "Public")
+
+    elif current_user.role in ["Faculty", "Staff"]:
+        query = query.filter(Document.document_type != "Confidential")
+
+    # Admin, Uploader, Management → see all
+
+    docs = query.order_by(Document.uploaded_at.desc()).all()
 
     return [
         {
@@ -312,10 +391,11 @@ async def list_documents(
             "category": d.category,
             "document_type": d.document_type,
             "uploaded_by": d.uploaded_by,
-            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M")
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
         }
         for d in docs
     ]
+
 
 
 from fastapi.staticfiles import StaticFiles
@@ -544,3 +624,214 @@ async def update_user_status(
     return {"message": "Status updated"}
 
 
+# @app.get("/documents/preview/{doc_id}")
+# async def preview_document(doc_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+#     document = db.query(Document).filter(Document.id == doc_id).first()
+#     if not document:
+#         raise HTTPException(status_code=404, detail="Document not found")
+
+#     return FileResponse(
+#         document.filepath,
+#         media_type="application/pdf",
+#         filename=document.filename
+        
+#         )
+
+@app.get("/documents/preview/{doc_id}")
+async def preview_document(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    document = db.query(Document).filter(Document.id == doc_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Viewer → Public only
+    if current_user.role == "Viewer" and document.document_type != "Public":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Faculty & Staff → no Confidential
+    if document.document_type == "Confidential" and current_user.role in ["Faculty", "Staff"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return FileResponse(
+        path=document.filepath,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"},
+    )
+
+
+
+
+@app.get("/documents/details/{doc_id}")
+async def document_details(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Viewer → Public only
+    if current_user.role == "Viewer" and doc.document_type != "Public":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Faculty & Staff → no Confidential
+    if doc.document_type == "Confidential" and current_user.role in ["Faculty", "Staff"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return {
+        "filename": doc.filename,
+        "description": doc.description,
+        "category": doc.category,
+        "document_type": doc.document_type,
+        "uploaded_by": doc.uploaded_by,
+        "uploaded_at": doc.uploaded_at,
+    }
+
+
+# @app.get("/documents/text/{doc_id}")
+# async def get_document_text(doc_id: int, db: Session = Depends(get_db)):
+#     doc = db.query(Document).filter(Document.id == doc_id).first()
+#     if not doc:
+#         raise HTTPException(status_code=404, detail="Document not found")
+
+#     text = extract_text_from_file(doc.filepath)
+#     return {"text": text}
+
+@app.get("/positions")
+async def get_positions(
+    db: Session = Depends(get_db)
+):
+    return db.query(Position).order_by(Position.name).all()
+
+
+@app.get("/offices")
+async def get_offices(db: Session = Depends(get_db)):
+    offices = db.query(Office).order_by(Office.name).all()
+
+    return [
+        {
+            "id": o.id,
+            "office_code": o.office_code,
+            "name": o.name
+        }
+        for o in offices
+    ]
+
+@app.get("/admin/positions")
+def list_positions(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+    return db.query(Position).order_by(Position.name).all()
+
+
+@app.post("/admin/positions")
+def create_position(
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    if db.query(Position).filter(Position.name == name).first():
+        raise HTTPException(400, "Position already exists")
+
+    pos = Position(name=name)
+    db.add(pos)
+    db.commit()
+    return {"message": "Position created"}
+
+
+@app.delete("/admin/positions/{id}")
+def delete_position(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    pos = db.query(Position).get(id)
+    if not pos:
+        raise HTTPException(404, "Position not found")
+
+    db.delete(pos)
+    db.commit()
+    return {"message": "Position deleted"}
+
+@app.get("/admin/offices")
+def list_offices(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+    return db.query(Office).order_by(Office.name).all()
+
+
+@app.post("/admin/offices")
+def create_office(
+    office_code: str = Form(...),
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    if db.query(Office).filter(
+        (Office.office_code == office_code) | (Office.name == name)
+    ).first():
+        raise HTTPException(400, "Office already exists")
+
+    office = Office(office_code=office_code.upper(), name=name)
+    db.add(office)
+    db.commit()
+    return {"message": "Office created"}
+
+
+@app.delete("/admin/offices/{id}")
+def delete_office(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    office = db.query(Office).get(id)
+    if not office:
+        raise HTTPException(404, "Office not found")
+
+    db.delete(office)
+    db.commit()
+    return {"message": "Office deleted"}
+
+@app.get("/documents/my-uploads")
+async def my_uploads(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # Only Admin & Uploader can access
+    require_role(["Admin", "Uploader"])(current_user)
+
+    docs = (
+        db.query(Document)
+        .filter(Document.uploaded_by == current_user.email)
+        .order_by(Document.uploaded_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "description": d.description,
+            "category": d.category,
+            "document_type": d.document_type,
+            "uploaded_by": d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+        }
+        for d in docs
+    ]

@@ -190,7 +190,7 @@ const users = ref([]);
 const loading = ref(true);
 const error = ref("");
 
-const roles = ["Admin", "Uploader", "Faculty", "Staff", "Viewer"];
+const roles = ["Admin", "Management", "Uploader", "Faculty", "Staff", "Viewer"];
 
 const showRoleModal = ref(false);
 const selectedUser = ref(null);

@@ -1,11 +1,12 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import api from "../../api";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
 
-const step = ref(1); // MULTI-STEP CONTROL
+// STEP CONTROL
+const step = ref(1);
 
 // FORM FIELDS
 const first_name = ref("");
@@ -20,26 +21,43 @@ const email = ref("");
 const password = ref("");
 const confirmPassword = ref("");
 
+// DROPDOWN DATA
+const positions = ref([]);
+const offices = ref([]);
+
+// UI STATE
 const loading = ref(false);
 const error = ref("");
 const success = ref("");
 
-// GO TO NEXT STEP WITH SIMPLE VALIDATION
+// LOAD POSITIONS & OFFICES FROM API
+onMounted(async () => {
+  try {
+    const [posRes, offRes] = await Promise.all([
+      api.get("/positions"),
+      api.get("/offices"),
+    ]);
+
+    positions.value = posRes.data;
+    offices.value = offRes.data;
+  } catch (err) {
+    console.error("Failed to load positions/offices", err);
+    error.value = "Failed to load form data. Please refresh.";
+  }
+});
+
+// STEP NAVIGATION
 function nextStep() {
   error.value = "";
 
-  if (step.value === 1) {
-    if (!first_name.value || !last_name.value) {
-      error.value = "Please enter all required personal details.";
-      return;
-    }
+  if (step.value === 1 && (!first_name.value || !last_name.value)) {
+    error.value = "Please enter all required personal details.";
+    return;
   }
 
-  if (step.value === 2) {
-    if (!position.value || !office.value) {
-      error.value = "Please provide your position and office.";
-      return;
-    }
+  if (step.value === 2 && (!position.value || !office.value)) {
+    error.value = "Please provide your position and office.";
+    return;
   }
 
   step.value++;
@@ -50,6 +68,7 @@ function previousStep() {
   step.value--;
 }
 
+// REGISTER
 async function handleRegister() {
   error.value = "";
   success.value = "";
@@ -67,8 +86,8 @@ async function handleRegister() {
       middle_name: middle_name.value,
       last_name: last_name.value,
       suffix: suffix.value,
-      position: position.value,
-      office: office.value,
+      position: position.value,   // ← position code or name
+      office: office.value,       // ← office_code
       email: email.value,
       password: password.value,
     });
@@ -83,6 +102,7 @@ async function handleRegister() {
   }
 }
 </script>
+
 
 
 <template>
@@ -144,35 +164,43 @@ async function handleRegister() {
           <!-- Position Dropdown -->
           <div>
             <label class="block text-gray-700 mb-1 text-sm">Position</label>
-            <select
-              v-model="position"
-              required
-              class="w-full p-3 border rounded-lg"
-            >
-              <option disabled value="">Select Position</option>
-              <option>Instructor I</option>
-              <option>Information Officer III</option>
-              <option>IT Officer I</option>
-              <option>Planning Officer I</option>
-              <option>Librarian III</option>
-            </select>
+<select
+  v-model="position"
+  required
+  class="w-full p-3 border rounded-lg"
+>
+  <option disabled value="">Select Position</option>
+
+  <option
+    v-for="p in positions"
+    :key="p.id"
+    :value="p.name"
+  >
+    {{ p.name }}
+  </option>
+</select>
+
           </div>
 
           <!-- Office Dropdown -->
           <div>
             <label class="block text-gray-700 mb-1 text-sm">Office</label>
-            <select
-              v-model="office"
-              required
-              class="w-full p-3 border rounded-lg"
-            >
-              <option disabled value="">Select Office</option>
-              <option>Technology Support Services Unit</option>
-              <option>Registrar's Office</option>
-              <option>Public Information Office</option>
-              <option>PRMO</option>
-              <option>Library</option>
-            </select>
+<select
+  v-model="office"
+  required
+  class="w-full p-3 border rounded-lg"
+>
+  <option disabled value="">Select Office</option>
+
+  <option
+    v-for="o in offices"
+    :key="o.id"
+    :value="o.office_code"
+  >
+    {{ o.name }} ({{ o.office_code }})
+  </option>
+</select>
+
           </div>
 
   <div class="flex justify-between">

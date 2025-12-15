@@ -1,27 +1,41 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import api from "@/api";
+import DocumentPreviewModal from "@/views/Documents/DocumentPreviewModal.vue";
 
 const documents = ref([]);
 const loading = ref(true);
 const error = ref("");
 const search = ref("");
+const showPreview = ref(false);
+const previewId = ref(null);
 
 const role = ref(localStorage.getItem("role")); // ROLE STORED HERE
+const activeTab = ref("all"); // all | mine
 
 // Fetch all documents
 async function fetchDocuments() {
   loading.value = true;
+  error.value = "";
 
   try {
-    const res = await api.get("/documents/list");
+    const url =
+      activeTab.value === "mine"
+        ? "/documents/my-uploads"
+        : "/documents/list";
+
+    const res = await api.get(url);
     documents.value = res.data;
   } catch (err) {
-    console.error("Error loading documents:", err);
     error.value = "Unable to load documents.";
   } finally {
     loading.value = false;
   }
+}
+
+function switchTab(tab) {
+  activeTab.value = tab;
+  fetchDocuments();
 }
 
 // Search filter
@@ -54,6 +68,14 @@ async function deleteDocument(id) {
   }
 }
 
+
+
+
+function openPreview(id) {
+  previewId.value = id;
+  showPreview.value = true;
+}
+
 // Load on page load
 onMounted(() => {
   fetchDocuments();
@@ -71,6 +93,29 @@ onMounted(() => {
         Upload
       </router-link>
     </div>
+<div  v-if="role === 'Admin' || role === 'Uploader'" class="flex gap-4 mb-4">
+  <button
+    @click="switchTab('all')"
+    :class="activeTab === 'all'
+      ? 'bg-green-700 text-white'
+      : 'bg-gray-200 text-gray-700'"
+    class="px-4 py-2 rounded"
+  >
+    All Documents
+  </button>
+
+  <!-- Admin & Uploader only -->
+  <button
+    v-if="role === 'Admin' || role === 'Uploader'"
+    @click="switchTab('mine')"
+    :class="activeTab === 'mine'
+      ? 'bg-green-700 text-white'
+      : 'bg-gray-200 text-gray-700'"
+    class="px-4 py-2 rounded"
+  >
+    My Uploads
+  </button>
+</div>
 
     <!-- Search bar -->
     <input
@@ -117,14 +162,14 @@ onMounted(() => {
           <td class="p-3">{{ doc.uploaded_at }}</td>
 
           <td class="p-3 text-center">
-            <button v-if="role==='Admin' || role==='Uploader'"
+            <button v-if="role==='Admin' || role==='Uploader' || role==='Faculty' || role==='Staff' || role==='Management'"
               @click="downloadFile(doc.filename)"
               class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
             >
               Download
             </button>
             <button v-if="role==='Viewer'"
-              @click="downloadFile(doc.filename)"
+              @click="openPreview(doc.id)"
               class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
             >
               View
@@ -134,7 +179,7 @@ onMounted(() => {
           <td class="p-3 text-center">
             <!-- FIXED ROLE CHECK -->
             <button
-              v-if="role === 'Admin'"
+              v-if="role === 'Admin' || role === 'Uploader'"
               @click="deleteDocument(doc.id)"
               class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
             >
@@ -150,4 +195,11 @@ onMounted(() => {
       No documents found.
     </div>
   </div>
+
+  <DocumentPreviewModal
+  :show="showPreview"
+  :docId="previewId"
+  @close="showPreview = false"
+/>
+
 </template>
