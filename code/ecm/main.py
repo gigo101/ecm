@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from pydantic import BaseModel
+from sqlalchemy import JSON
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +14,11 @@ from fastapi import UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from nlp_utils import extract_text_from_file, classify_document
 from fastapi.responses import FileResponse
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
 
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 
 # pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -93,7 +98,7 @@ class Document(Base):
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     document_type = Column(String(50), default="Public")  # NEW FIELD
-
+    embedding = Column(JSON)  # ⭐ ADD THIS
 Base.metadata.create_all(bind=engine)
 
 # --- TOKEN SCHEMA ---
@@ -341,6 +346,16 @@ async def upload_document(
         file_text = extract_text_from_file(file_location)
         combined_text = f"{description}\n{file_text}"
         category = classify_document(combined_text)
+    else:
+        # Still extract text for embeddings even if category is manual
+        file_text = extract_text_from_file(file_location)
+
+    # =====================================================
+    # ⭐ STEP 4 — GENERATE SEMANTIC EMBEDDING (PUT HERE)
+    # =====================================================
+    embedding = embedder.encode(
+        file_text[:5000] if file_text else f"{description} {file.filename}"
+    ).tolist()
 
     # ✅ 6. Save document record with updated filename
     document = Document(
@@ -349,7 +364,8 @@ async def upload_document(
         description=description,
         category=category,
         document_type=document_type,
-        uploaded_by=current_user.email
+        uploaded_by=current_user.email,
+        embedding=embedding  # ⭐ SAVE EMBEDDING
     )
 
     db.add(document)
@@ -842,4 +858,46 @@ async def my_uploads(
         }
         for d in docs
     ]
+
+
+
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+@app.get("/documents/semantic-search")
+async def semantic_search(
+    query: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    query_embedding = embedder.encode(query).reshape(1, -1)
+
+    docs = db.query(Document).filter(Document.embedding != None).all()
+
+    results = []
+
+    for doc in docs:
+        doc_embedding = np.array(doc.embedding).reshape(1, -1)
+        score = cosine_similarity(query_embedding, doc_embedding)[0][0]
+
+        # Apply RBAC filtering
+        if current_user.role == "Viewer" and doc.document_type != "Public":
+            continue
+        if current_user.role in ["Faculty", "Staff"] and doc.document_type == "Confidential":
+            continue
+
+        if score > 0.35:  # threshold
+            results.append({
+                "id": doc.id,
+                "filename": doc.filename,
+                "description": doc.description,
+                "category": doc.category,
+                "document_type": doc.document_type,
+                "uploaded_by": doc.uploaded_by,
+                "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+                "score": round(float(score), 3)
+            })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
 

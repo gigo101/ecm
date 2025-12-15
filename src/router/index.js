@@ -97,6 +97,13 @@ const routes = [
   component: Offices,
   meta: { requiresAuth: true, role: "Admin" }
 },
+{
+  path: "/semantic-search",
+  name: "SemanticSearch",
+  component: () => import("@/views/Documents/SemanticSearch.vue"),
+  meta: { requiresAuth: true }
+}
+,
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',

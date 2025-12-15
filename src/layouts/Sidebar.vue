@@ -28,12 +28,12 @@ const role = ref(localStorage.getItem("role"));
       >
         Documents
       </router-link>
-
       <router-link
-        to="/search"
-        class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
-      >
-        Search
+        to="/semantic-search"
+        class="flex items-center gap-2 px-4 py-2 hover:bg-dns_green"
+        >
+        <i class="pi pi-search"></i>
+        Semantic Search
       </router-link>
 
       <router-link
