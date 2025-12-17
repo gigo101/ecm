@@ -58,16 +58,26 @@ async function handleLogin() {
     style="background-image: url('/images/bg-building.jpg'); background-blend-mode: overlay;"
   >
     <div
-      class="bg-white/80 backdrop-blur-lg p-10 rounded-3xl shadow-2xl w-full max-w-md transition transform hover:scale-[1.01]"
+      class="bg-white/80 backdrop-blur-lg p-10 rounded-3xl shadow-2xl w-full max-w-lg transition transform hover:scale-[1.01]"
     >
-      <div class="flex flex-col items-center mb-8">
-        <h2 class="text-3xl font-extrabold text-green-800 tracking-tight">
-          Welcome Back
-        </h2>
-        <p class="text-gray-600 text-sm mt-2">
-          Sign in to manage your documents
-        </p>
-      </div>
+<div class="flex flex-col items-center mb-10 text-center">
+  <!-- APPLICATION TITLE -->
+  <h1 class="text-2xl font-extrabold text-green-900 tracking-wide uppercase">
+    Enterprise Content Management System
+  </h1>
+
+  <div class="w-16 h-1 bg-green-700 rounded-full my-4"></div>
+
+  <!-- PAGE TITLE -->
+  <h2 class="text-3xl font-bold text-green-800 tracking-tight">
+    Welcome Back
+  </h2>
+
+  <p class="text-gray-600 text-sm mt-2">
+    Sign in to manage your documents
+  </p>
+</div>
+
 
       <form @submit.prevent="handleLogin" class="space-y-5">
         <div>

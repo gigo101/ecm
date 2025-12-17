@@ -3,6 +3,9 @@ import docx
 import pytesseract
 from PIL import Image
 import io
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+import spacy
 
 def extract_text_from_file(filepath: str):
     # PDF
@@ -195,3 +198,34 @@ def classify_document(text: str):
         return "General"
 
     return best_category
+
+
+
+nlp = spacy.load("en_core_web_sm")
+
+def get_relevant_sentences(text: str, query: str, embedder, top_k=5):
+    if not text or not query:
+        return []
+
+    doc = nlp(text)
+    sentences = [sent.text.strip() for sent in doc.sents if len(sent.text.strip()) > 20]
+
+    if not sentences:
+        return []
+
+    sentence_embeddings = embedder.encode(sentences)
+    query_embedding = embedder.encode(query).reshape(1, -1)
+
+    similarities = cosine_similarity(query_embedding, sentence_embeddings)[0]
+
+    ranked = sorted(
+        zip(sentences, similarities),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    return [
+        {"sentence": s, "score": round(float(score), 3)}
+        for s, score in ranked[:top_k]
+        if score > 0.35
+    ]

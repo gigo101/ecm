@@ -25,7 +25,7 @@ const role = ref(localStorage.getItem("role"));
       <router-link
         to="/documents"
         class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
-      >
+      >  <i class="pi pi-file text-dns_light text-lg"></i>
         Documents
       </router-link>
       <router-link
@@ -34,13 +34,6 @@ const role = ref(localStorage.getItem("role"));
         >
         <i class="pi pi-search"></i>
         Semantic Search
-      </router-link>
-
-      <router-link
-        to="/chat"
-        class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
-      >
-        Chatbot
       </router-link>
 
       <!-- ADMIN SECTION -->
@@ -53,21 +46,21 @@ const role = ref(localStorage.getItem("role"));
           to="/users"
           class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
         >
-          👥 User Management
+         <i class="pi pi-user-edit text-dns_light text-lg"></i> User Management
         </router-link>
 
         <router-link
           to="/admin/offices"
           class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
         >
-          🏢 Offices
+        <i class="pi pi-warehouse text-dns_light text-lg"></i>Offices
         </router-link>
 
         <router-link
           to="/admin/positions"
           class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
         >
-          🧑‍💼 Positions
+          <i class="pi pi-users text-dns_light text-lg"></i> Positions
         </router-link>
       </div>
 

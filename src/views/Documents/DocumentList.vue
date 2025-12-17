@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import api from "@/api";
 import DocumentPreviewModal from "@/views/Documents/DocumentPreviewModal.vue";
+import { useToast } from "vue-toastification";
 
 const documents = ref([]);
 const loading = ref(true);
@@ -9,6 +10,7 @@ const error = ref("");
 const search = ref("");
 const showPreview = ref(false);
 const previewId = ref(null);
+const toast = useToast();
 
 const role = ref(localStorage.getItem("role")); // ROLE STORED HERE
 const activeTab = ref("all"); // all | mine
@@ -61,10 +63,10 @@ async function deleteDocument(id) {
 
   try {
     await api.delete(`/documents/${id}`);
-    alert("Document deleted successfully!");
 
     // Reload
     fetchDocuments();
+    toast.success("Document deleted successfully.");
   } catch (err) {
     console.error("Delete error:", err);
     alert("Failed to delete document.");
@@ -205,7 +207,7 @@ onMounted(() => {
     </div>
   </div>
 
-  <DocumentPreviewModal
+  <DocumentPreviewModal 
   :show="showPreview"
   :docId="previewId"
   @close="showPreview = false"

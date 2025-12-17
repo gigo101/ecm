@@ -10,6 +10,14 @@ const officeCode = ref("");
 const officeName = ref("");
 const error = ref("");
 
+const showEditModal = ref(false);
+
+const editOffice = ref({
+  id: null,
+  office_code: "",
+  name: "",
+});
+
 async function loadOffices() {
   const res = await api.get("/admin/offices");
   offices.value = res.data;
@@ -44,6 +52,32 @@ async function deleteOffice(id) {
   loadOffices();
   toast.success("Office deleted successfully.");
 }
+
+
+
+function openEditModal(office) {
+  editOffice.value = { ...office };
+  showEditModal.value = true;
+}
+
+async function updateOffice() {
+  try {
+    const formData = new FormData();
+    formData.append("office_code", editOffice.value.office_code);
+    formData.append("name", editOffice.value.name);
+
+    await api.put(`/admin/offices/${editOffice.value.id}`, formData);
+
+    toast.success("Office updated successfully.");
+    showEditModal.value = false;
+    loadOffices();
+  } catch (err) {
+    toast.error(
+      err.response?.data?.detail || "Failed to update office."
+    );
+  }
+}
+
 
 onMounted(loadOffices);
 </script>
@@ -81,7 +115,10 @@ onMounted(loadOffices);
       <th class="p-3 text-left">Office Name</th>
 
       <!-- Desktop -->
+      <th class="p-3 text-center hidden md:table-cell">Edit</th>
       <th class="p-3 text-center hidden md:table-cell">Delete</th>
+     
+
 
       <!-- Mobile -->
       <th class="p-3 text-center md:hidden">Actions</th>
@@ -94,6 +131,17 @@ onMounted(loadOffices);
       <td class="p-3">{{ o.name }}</td>
 
       <!-- Desktop -->
+
+            <td class="p-3 text-center hidden md:table-cell">
+  <button
+    @click="openEditModal(o)"
+    class="text-blue-600 hover:text-blue-800"
+    title="Edit office"
+  >
+    ✏️
+  </button>
+  
+</td>
       <td class="p-3 text-center hidden md:table-cell">
         <button
           @click="deleteOffice(o.id)"
@@ -108,8 +156,15 @@ onMounted(loadOffices);
       <td class="p-3 md:hidden text-center">
         <details class="relative inline-block">
           <summary class="cursor-pointer py-1 px-3 bg-gray-200 rounded">⋮</summary>
-
+          
           <div class="absolute right-0 mt-1 bg-white border shadow rounded w-32 z-20">
+            <button
+  @click="openEditModal(o)"
+  class="block w-full text-left px-3 py-2 hover:bg-gray-100"
+>
+  ✏️ Edit
+</button>
+
             <button
               @click="deleteOffice(o.id)"
               class="block w-full text-left px-3 py-2 hover:bg-red-100 text-red-600"
@@ -117,11 +172,49 @@ onMounted(loadOffices);
               🗑️ Delete
             </button>
           </div>
+          
         </details>
       </td>
+
+      
     </tr>
   </tbody>
 </table>
+<div
+  v-if="showEditModal"
+  class="fixed inset-0 bg-black/40 flex items-center justify-center"
+>
+  <div class="bg-white p-6 rounded-lg w-96 shadow-lg">
+    <h2 class="text-xl font-semibold mb-4">Edit Office</h2>
+
+    <input
+      v-model="editOffice.office_code"
+      class="w-full border p-2 mb-3"
+      placeholder="Office Code"
+    />
+
+    <input
+      v-model="editOffice.name"
+      class="w-full border p-2 mb-4"
+      placeholder="Office Name"
+    />
+
+    <div class="flex justify-end gap-2">
+      <button
+        @click="showEditModal = false"
+        class="px-4 py-2 bg-gray-300 rounded"
+      >
+        Cancel
+      </button>
+      <button
+        @click="updateOffice"
+        class="px-4 py-2 bg-green-700 text-white rounded"
+      >
+        Save
+      </button>
+    </div>
+  </div>
+</div>
 
   </div>
 </template>

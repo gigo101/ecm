@@ -8,6 +8,34 @@ const toast = useToast(); // ✅ REQUIRED
 const positions = ref([]);
 const newPosition = ref("");
 const error = ref("");
+const showEditModal = ref(false);
+
+const editPosition = ref({
+  id: null,
+  name: "",
+});
+
+function openEditModal(position) {
+  editPosition.value = { ...position };
+  showEditModal.value = true;
+}
+
+async function updatePosition() {
+  try {
+    const formData = new FormData();
+    formData.append("name", editPosition.value.name);
+
+    await api.put(`/admin/positions/${editPosition.value.id}`, formData);
+
+    toast.success("Position updated successfully.");
+    showEditModal.value = false;
+    loadPositions();
+  } catch (err) {
+    toast.error(
+      err.response?.data?.detail || "Failed to update position."
+    );
+  }
+}
 
 async function loadPositions() {
   const res = await api.get("/admin/positions");
@@ -80,6 +108,7 @@ onMounted(loadPositions);
       <th class="p-3 text-left">Position Name</th>
 
       <!-- Desktop -->
+       <th class="p-3 text-center hidden md:table-cell">Edit</th>
       <th class="p-3 text-center hidden md:table-cell">Delete</th>
 
       <!-- Mobile -->
@@ -92,6 +121,16 @@ onMounted(loadPositions);
       <td class="p-3">{{ p.name }}</td>
 
       <!-- Desktop -->
+       <td class="p-3 text-center hidden md:table-cell">
+  <button
+    @click="openEditModal(p)"
+    class="text-blue-600 hover:text-blue-800"
+    title="Edit position"
+  >
+    ✏️
+  </button>
+</td>
+
       <td class="p-3 text-center hidden md:table-cell">
         <button
           @click="deletePosition(p.id)"
@@ -106,8 +145,15 @@ onMounted(loadPositions);
       <td class="p-3 md:hidden text-center">
         <details class="relative inline-block">
           <summary class="cursor-pointer py-1 px-3 bg-gray-200 rounded">⋮</summary>
-
+          
           <div class="absolute right-0 mt-1 bg-white border shadow rounded w-32 z-20">
+            <button
+  @click="openEditModal(p)"
+  class="block w-full text-left px-3 py-2 hover:bg-gray-100"
+>
+  ✏️ Edit
+</button>
+
             <button
               @click="deletePosition(p.id)"
               class="block w-full text-left px-3 py-2 hover:bg-red-100 text-red-600"
@@ -120,6 +166,36 @@ onMounted(loadPositions);
     </tr>
   </tbody>
 </table>
+
+<div
+  v-if="showEditModal"
+  class="fixed inset-0 bg-black/40 flex items-center justify-center"
+>
+  <div class="bg-white p-6 rounded-lg w-96 shadow-lg">
+    <h2 class="text-xl font-semibold mb-4">Edit Position</h2>
+
+    <input
+      v-model="editPosition.name"
+      class="w-full border p-2 mb-4"
+      placeholder="Position Name"
+    />
+
+    <div class="flex justify-end gap-2">
+      <button
+        @click="showEditModal = false"
+        class="px-4 py-2 bg-gray-300 rounded"
+      >
+        Cancel
+      </button>
+      <button
+        @click="updatePosition"
+        class="px-4 py-2 bg-green-700 text-white rounded"
+      >
+        Save
+      </button>
+    </div>
+  </div>
+</div>
 
   </div>
 </template>

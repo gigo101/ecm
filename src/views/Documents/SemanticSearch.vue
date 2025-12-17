@@ -7,9 +7,16 @@ const query = ref("");
 const results = ref([]);
 const loading = ref(false);
 const error = ref("");
-
+const previewQuery = ref("");
 const showPreview = ref(false);
 const previewId = ref(null);
+const highlights = ref([]);
+
+const props = defineProps({
+  show: Boolean,
+  docId: Number,
+  query: String,
+});
 
 async function runSemanticSearch() {
   if (!query.value.trim()) return;
@@ -33,8 +40,10 @@ async function runSemanticSearch() {
 
 function openPreview(id) {
   previewId.value = id;
+  previewQuery.value = query.value; // ← pass search query
   showPreview.value = true;
 }
+
 </script>
 
 <template>
@@ -106,6 +115,7 @@ function openPreview(id) {
     <DocumentPreviewModal
       :show="showPreview"
       :docId="previewId"
+      :query="previewQuery"
       @close="showPreview = false"
     />
   </div>

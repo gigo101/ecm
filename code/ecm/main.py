@@ -17,6 +17,9 @@ from fastapi.responses import FileResponse
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
+from nlp_utils import get_relevant_sentences
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -861,8 +864,7 @@ async def my_uploads(
 
 
 
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
+
 
 @app.get("/documents/semantic-search")
 async def semantic_search(
@@ -901,3 +903,86 @@ async def semantic_search(
     results.sort(key=lambda x: x["score"], reverse=True)
     return results
 
+
+from nlp_utils import get_relevant_sentences
+
+@app.get("/documents/highlights/{doc_id}")
+async def document_highlights(
+    doc_id: int,
+    query: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # RBAC check
+    if current_user.role == "Viewer" and doc.document_type != "Public":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    text = extract_text_from_file(doc.filepath)
+
+    highlights = get_relevant_sentences(
+        text=text,
+        query=query,
+        embedder=embedder,
+        top_k=5
+    )
+
+    return highlights
+
+
+
+
+@app.put("/admin/offices/{id}")
+def update_office(
+    id: int,
+    office_code: str = Form(...),
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    office = db.query(Office).filter(Office.id == id).first()
+    if not office:
+        raise HTTPException(status_code=404, detail="Office not found")
+
+    # prevent duplicates
+    if db.query(Office).filter(
+        Office.id != id,
+        ((Office.office_code == office_code) | (Office.name == name))
+    ).first():
+        raise HTTPException(status_code=400, detail="Office already exists")
+
+    office.office_code = office_code.upper()
+    office.name = name
+    db.commit()
+
+    return {"message": "Office updated successfully"}
+
+@app.put("/admin/positions/{id}")
+def update_position(
+    id: int,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    position = db.query(Position).filter(Position.id == id).first()
+    if not position:
+        raise HTTPException(status_code=404, detail="Position not found")
+
+    # Prevent duplicates
+    if db.query(Position).filter(
+        Position.id != id,
+        Position.name == name
+    ).first():
+        raise HTTPException(status_code=400, detail="Position already exists")
+
+    position.name = name
+    db.commit()
+
+    return {"message": "Position updated successfully"}
