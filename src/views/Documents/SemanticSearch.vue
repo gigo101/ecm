@@ -11,6 +11,7 @@ const previewQuery = ref("");
 const showPreview = ref(false);
 const previewId = ref(null);
 const highlights = ref([]);
+const previewSource = ref("SEMANTIC_SEARCH"); // 👈 ADD
 
 const props = defineProps({
   show: Boolean,
@@ -41,6 +42,7 @@ async function runSemanticSearch() {
 function openPreview(id) {
   previewId.value = id;
   previewQuery.value = query.value; // ← pass search query
+  previewSource.value = "SEMANTIC_SEARCH"; // 👈 ADD
   showPreview.value = true;
 }
 
@@ -116,6 +118,7 @@ function openPreview(id) {
       :show="showPreview"
       :docId="previewId"
       :query="previewQuery"
+      :source="previewSource"
       @close="showPreview = false"
     />
   </div>

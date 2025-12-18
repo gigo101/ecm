@@ -62,6 +62,15 @@ const role = ref(localStorage.getItem("role"));
         >
           <i class="pi pi-users text-dns_light text-lg"></i> Positions
         </router-link>
+
+        <router-link
+          v-if="role === 'Admin'"
+          to="/admin/document-logs"
+          class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
+        >
+        <i class="pi pi-history text-dns_light text-lg"></i> Document Logs
+        </router-link>
+
       </div>
 
     </nav>

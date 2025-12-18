@@ -97,12 +97,15 @@ class Document(Base):
     filename = Column(String(255))
     filepath = Column(String(500))
     description = Column(Text)
-    category = Column(String(100), default="General")   # NEW CATEGORY FIELD
+    category = Column(String(100), default="General")
+
+    year_approved = Column(Integer, nullable=True)   # ✅ NEW FIELD
+
+    document_type = Column(String(50), default="Public")
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
-    document_type = Column(String(50), default="Public")  # NEW FIELD
     embedding = Column(JSON)  # ⭐ ADD THIS
-Base.metadata.create_all(bind=engine)
+
 
 # --- TOKEN SCHEMA ---
 class Token(BaseModel):
@@ -138,7 +141,18 @@ class Office(Base):
     office_code = Column(String(50), unique=True, nullable=False, index=True)
     name = Column(String(255), unique=True, nullable=False)
 
+class DocumentLog(Base):
+    __tablename__ = "document_logs"
 
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, index=True)
+    user_email = Column(String(255))
+    action = Column(String(50))        # VIEW
+    source = Column(String(50))        # LIST | SEMANTIC_SEARCH
+    accessed_at = Column(DateTime, default=datetime.utcnow)
+
+
+Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
 def get_db():
     db = SessionLocal()
@@ -320,6 +334,7 @@ async def upload_document(
     file: UploadFile = File(...),
     description: str = Form(""),
     category: str = Form("General"),
+    year_approved: int = Form(None),
     document_type: str = Form("Public"),
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -366,6 +381,7 @@ async def upload_document(
         filepath=file_location,
         description=description,
         category=category,
+        year_approved=year_approved,
         document_type=document_type,
         uploaded_by=current_user.email,
         embedding=embedding  # ⭐ SAVE EMBEDDING
@@ -378,7 +394,8 @@ async def upload_document(
     return {
         "message": "File uploaded successfully",
         "filename": new_filename,
-        "auto_category": category
+        "auto_category": category,
+        "year_approved": year_approved
     }
 
 
@@ -408,6 +425,7 @@ async def list_documents(
             "filename": d.filename,
             "description": d.description,
             "category": d.category,
+            "year_approved": d.year_approved,
             "document_type": d.document_type,
             "uploaded_by": d.uploaded_by,
             "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
@@ -665,6 +683,7 @@ async def update_user_status(
 @app.get("/documents/preview/{doc_id}")
 async def preview_document(
     doc_id: int,
+    source: str = "LIST",
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -679,6 +698,16 @@ async def preview_document(
     # Faculty & Staff → no Confidential
     if document.document_type == "Confidential" and current_user.role in ["Faculty", "Staff"]:
         raise HTTPException(status_code=403, detail="Access denied")
+
+  # ✅ LOG VIEW
+    log = DocumentLog(
+        document_id=doc_id,
+        user_email=current_user.email,
+        action="VIEW",
+        source=source.upper()
+    )
+    db.add(log)
+    db.commit()
 
     return FileResponse(
         path=document.filepath,
@@ -706,6 +735,16 @@ async def document_details(
     # Faculty & Staff → no Confidential
     if doc.document_type == "Confidential" and current_user.role in ["Faculty", "Staff"]:
         raise HTTPException(status_code=403, detail="Access denied")
+
+      # ✅ LOG DETAILS VIEW
+    log = DocumentLog(
+        document_id=doc.id,
+        user_email=current_user.email,
+        action="VIEW",
+        source="LIST"
+    )
+    db.add(log)
+    db.commit()
 
     return {
         "filename": doc.filename,
@@ -986,3 +1025,34 @@ def update_position(
     db.commit()
 
     return {"message": "Position updated successfully"}
+
+
+@app.get("/admin/document-logs")
+async def get_document_logs(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    logs = (
+        db.query(DocumentLog, Document.filename)
+        .join(Document, Document.id == DocumentLog.document_id)
+        .order_by(DocumentLog.accessed_at.desc())
+        .all()
+    )
+
+ # logs is a list of tuples: (DocumentLog, filename)
+    result = []
+
+    for log_entry, filename in logs:
+        result.append({
+            "id": log_entry.id,
+            "document_id": log_entry.document_id,
+            "document": filename,
+            "user": log_entry.user_email,
+            "action": log_entry.action,
+            "source": log_entry.source,
+            "accessed_at": log_entry.accessed_at.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+    return result

@@ -121,11 +121,13 @@ import VuePdfEmbed from "vue-pdf-embed";
 const props = defineProps({
   show: Boolean,
   docId: Number,
-  query: {
+  query: String,
+  source: {
     type: String,
-    default: ""
+    default: "LIST"
   }
 });
+
 
 const emit = defineEmits(["close"]);
 
@@ -171,7 +173,8 @@ watch(() => props.docId, async (id) => {
     // PDF blob
     if (isPDF.value) {
       const res = await api.get(`/documents/preview/${id}`, {
-        responseType: "blob"
+        responseType: "blob",
+        params: { source: props.source }   // 👈 THIS IS KEY
       });
       const blob = new Blob([res.data], { type: "application/pdf" });
       pdfSource.value = URL.createObjectURL(blob);

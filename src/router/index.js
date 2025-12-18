@@ -104,6 +104,13 @@ const routes = [
   meta: { requiresAuth: true }
 }
 ,
+
+{
+  path: "/admin/document-logs",
+  component: () => import("@/views/Admin/DocumentLogs.vue"),
+  meta: { requiresAuth: true, requiresAdmin: true }
+}
+,
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',

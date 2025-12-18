@@ -140,6 +140,7 @@ onMounted(() => {
           <!-- <th class="p-3 text-left">Description</th> -->
           <th class="p-3 text-left">Category</th>
           <th class="p-3 text-left">Type</th>
+          <th class="p-3 text-left">Year Approved</th>
           <th class="p-3 text-left">Uploaded By</th>
           <th class="p-3 text-left">Date</th>
           <th class="p-3 text-center" colspan="2">Action</th>
@@ -162,10 +163,10 @@ onMounted(() => {
           <span v-else class="text-green-700">
             {{ doc.document_type }}
           </span>
-</td>
+          </td>
+          <td class="p-3">{{ doc.year_approved }}</td>
           <td class="p-3">{{ doc.uploaded_by }}</td>
           <td class="p-3">{{ doc.uploaded_at }}</td>
-
           <td class="p-3 text-center">
             <div class="flex justify-center gap-2">
               <!-- View -->

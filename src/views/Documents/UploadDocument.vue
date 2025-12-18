@@ -10,9 +10,11 @@ const toast = useToast();
 const selectedFile = ref(null);
 const description = ref("");
 const category = ref("Auto");
+const yearApproved = ref(new Date().getFullYear());
 const error = ref("");
 const loading = ref(false);
 const documentType = ref("Public");
+
 
 function handleFileChange(e) {
   selectedFile.value = e.target.files[0];
@@ -30,6 +32,7 @@ async function uploadDocument() {
   formData.append("file", selectedFile.value);
   formData.append("description", description.value);
   formData.append("category", category.value);
+  formData.append("year_approved", yearApproved.value);
   formData.append("document_type", documentType.value);
 
   loading.value = true;
@@ -96,6 +99,18 @@ async function uploadDocument() {
         <option>Policies</option>
         <option>Research</option>
       </select>
+
+       <label class="text-sm font-medium text-gray-700">Year Approved</label>
+
+      <input
+        type="number"
+        v-model="yearApproved"
+        min="1900"
+        :max="new Date().getFullYear()"
+        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+        placeholder="e.g. 2024"
+      />
+
 
       <label class="text-sm font-medium text-gray-700">Document Type</label>
       <select
