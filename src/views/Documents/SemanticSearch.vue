@@ -12,12 +12,45 @@ const showPreview = ref(false);
 const previewId = ref(null);
 const highlights = ref([]);
 const previewSource = ref("SEMANTIC_SEARCH"); // 👈 ADD
+const yearFrom = ref(null);
+const yearTo = ref(null);
+
 
 const props = defineProps({
   show: Boolean,
   docId: Number,
   query: String,
 });
+
+// async function runSemanticSearch() {
+//   if (!query.value.trim()) return;
+
+//   loading.value = true;
+//   error.value = "";
+//   results.value = [];
+
+//   try {
+//     const res = await api.get("/documents/semantic-search", {
+//     const params = { query: query.value };
+
+//     if (yearFrom.value) params.year_from = Number(yearFrom.value);
+//     if (yearTo.value) params.year_to = Number(yearTo.value);
+
+// const res = await api.get("/documents/semantic-search", { params });
+
+
+// const res = await api.get("/documents/semantic-search", { params });
+
+//     });
+//     results.value = res.data;
+//   } catch (err) {
+//     console.error(err);
+//     error.value = "Semantic search failed.";
+//   } finally {
+//     loading.value = false;
+//   }
+// }
+
 
 async function runSemanticSearch() {
   if (!query.value.trim()) return;
@@ -27,9 +60,14 @@ async function runSemanticSearch() {
   results.value = [];
 
   try {
-    const res = await api.get("/documents/semantic-search", {
-      params: { query: query.value }
-    });
+    // Build params object safely
+    const params = { query: query.value };
+
+    if (yearFrom.value) params.year_from = Number(yearFrom.value);
+    if (yearTo.value) params.year_to = Number(yearTo.value);
+
+    const res = await api.get("/documents/semantic-search", { params });
+
     results.value = res.data;
   } catch (err) {
     console.error(err);
@@ -64,6 +102,22 @@ function openPreview(id) {
         placeholder="Enter your question or topic..."
         class="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
       />
+
+<input
+  type="number"
+  v-model="yearFrom"
+  placeholder="From year"
+  class="p-3 border rounded-lg w-40 focus:ring-2 focus:ring-green-500"
+/>
+
+<input
+  type="number"
+  v-model="yearTo"
+  placeholder="To year"
+  class="p-3 border rounded-lg w-40 focus:ring-2 focus:ring-green-500"
+/>
+
+
       <button
         @click="runSemanticSearch"
         class="bg-green-700 text-white px-6 rounded-lg"

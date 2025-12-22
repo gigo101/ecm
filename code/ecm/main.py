@@ -904,35 +904,117 @@ async def my_uploads(
 
 
 
+# @app.get("/documents/semantic-search")
+# async def semantic_search(
+#     query: str,
+#     year_from: int | None = None,   # ✅ NEW
+#     year_to: int | None = None,     # ✅ NEW
+#     db: Session = Depends(get_db),
+#     current_user = Depends(get_current_user)
+# ):
+#     if not query.strip():
+#         return []
+
+    # # Encode query
+    # query_embedding = embedder.encode(query).reshape(1, -1)
+
+    # # -----------------------------
+    # # 🔎 BASE QUERY (WITH YEAR FILTER)
+    # # -----------------------------
+    # doc_query = db.query(Document).filter(Document.embedding != None)
+
+    # # RBAC filtering
+    # if current_user.role == "Viewer":
+    #     doc_query = doc_query.filter(Document.document_type == "Public")
+    # elif current_user.role in ["Faculty", "Staff"]:
+    #     doc_query = doc_query.filter(Document.document_type != "Confidential")
+
+    # # ✅ YEAR FILTER (APPLIED FIRST)
+    # if year_from:
+    #     doc_query = doc_query.filter(Document.year_approved >= year_from)
+
+    # if year_to:
+    #     doc_query = doc_query.filter(Document.year_approved <= year_to)
+
+    # docs = doc_query.all()
+
+    # if not docs:
+    #     return []
+
+    # -----------------------------
+    # 🧠 SEMANTIC SCORING
+    # # -----------------------------
+    # results = []
+
+    # for doc in docs:
+    #     doc_embedding = np.array(doc.embedding).reshape(1, -1)
+    #     score = cosine_similarity(query_embedding, doc_embedding)[0][0]
+
+    #     if score > 0.35:  # similarity threshold
+    #         results.append({
+    #             "id": doc.id,
+    #             "filename": doc.filename,
+    #             "description": doc.description,
+    #             "category": doc.category,
+    #             "year_approved": doc.year_approved,   # ✅ INCLUDED
+    #             "document_type": doc.document_type,
+    #             "uploaded_by": doc.uploaded_by,
+    #             "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+    #             "score": round(float(score), 3)
+    #         })
+
+    # # Sort by relevance
+    # results.sort(key=lambda x: x["score"], reverse=True)
+
+    # return results
+
 
 @app.get("/documents/semantic-search")
 async def semantic_search(
     query: str,
+    year_from: int | None = None,
+    year_to: int | None = None,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    if not query.strip():
+        return []
+
     query_embedding = embedder.encode(query).reshape(1, -1)
 
-    docs = db.query(Document).filter(Document.embedding != None).all()
+    # Base query
+    doc_query = db.query(Document).filter(Document.embedding != None)
 
+    # RBAC
+    if current_user.role == "Viewer":
+        doc_query = doc_query.filter(Document.document_type == "Public")
+    elif current_user.role in ["Faculty", "Staff"]:
+        doc_query = doc_query.filter(Document.document_type != "Confidential")
+
+    # Year filter
+    if year_from is not None:
+        doc_query = doc_query.filter(Document.year_approved >= year_from)
+
+    if year_to is not None:
+        doc_query = doc_query.filter(Document.year_approved <= year_to)
+
+    docs = doc_query.all()
     results = []
 
     for doc in docs:
+        if not doc.embedding:
+            continue  # ⛑ safety
+
         doc_embedding = np.array(doc.embedding).reshape(1, -1)
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
 
-        # Apply RBAC filtering
-        if current_user.role == "Viewer" and doc.document_type != "Public":
-            continue
-        if current_user.role in ["Faculty", "Staff"] and doc.document_type == "Confidential":
-            continue
-
-        if score > 0.35:  # threshold
+        if score >= 0.35:
             results.append({
                 "id": doc.id,
                 "filename": doc.filename,
                 "description": doc.description,
                 "category": doc.category,
+                "year_approved": doc.year_approved,
                 "document_type": doc.document_type,
                 "uploaded_by": doc.uploaded_by,
                 "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
