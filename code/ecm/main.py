@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from pydantic import BaseModel
 from sqlalchemy import JSON
@@ -715,6 +715,57 @@ async def preview_document(
         headers={"Content-Disposition": "inline"},
     )
 
+
+from fastapi import Query
+
+@app.get("/documents/download/{doc_id}")
+async def download_document(
+    doc_id: int,
+    token: str = Query(None),   # 👈 accept token from query
+    db: Session = Depends(get_db)
+):
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid user")
+
+    document = db.query(Document).filter(Document.id == doc_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 🔐 RBAC
+    if user.role == "Viewer" and document.document_type != "Public":
+        raise HTTPException(status_code=403, detail="You are not allowed to download this file")
+
+    if document.document_type == "Confidential" and user.role in ["Faculty", "Staff"]:
+        raise HTTPException(status_code=403, detail="You are not allowed to download this file")
+
+    # ✅ LOG DOWNLOAD
+    log = DocumentLog(
+        document_id=document.id,
+        user_email=user.email,
+        action="DOWNLOAD",
+        source="PREVIEW"
+    )
+    db.add(log)
+    db.commit()
+
+    return FileResponse(
+        path=document.filepath,
+        filename=document.filename,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{document.filename}"'
+        }
+    )
 
 
 

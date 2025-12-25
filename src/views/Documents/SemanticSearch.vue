@@ -14,6 +14,7 @@ const highlights = ref([]);
 const previewSource = ref("SEMANTIC_SEARCH"); // 👈 ADD
 const yearFrom = ref(null);
 const yearTo = ref(null);
+const role = ref(localStorage.getItem("role"));
 
 
 const props = defineProps({
@@ -22,37 +23,23 @@ const props = defineProps({
   query: String,
 });
 
-// async function runSemanticSearch() {
-//   if (!query.value.trim()) return;
 
-//   loading.value = true;
-//   error.value = "";
-//   results.value = [];
+const currentYear = new Date().getFullYear();
 
-//   try {
-//     const res = await api.get("/documents/semantic-search", {
-//     const params = { query: query.value };
-
-//     if (yearFrom.value) params.year_from = Number(yearFrom.value);
-//     if (yearTo.value) params.year_to = Number(yearTo.value);
-
-// const res = await api.get("/documents/semantic-search", { params });
-
-
-// const res = await api.get("/documents/semantic-search", { params });
-
-//     });
-//     results.value = res.data;
-//   } catch (err) {
-//     console.error(err);
-//     error.value = "Semantic search failed.";
-//   } finally {
-//     loading.value = false;
-//   }
-// }
+const years = Array.from(
+  { length: currentYear - 2010 },
+  (_, i) => currentYear - i
+);
 
 
 async function runSemanticSearch() {
+
+
+if (yearFrom.value && yearTo.value && yearFrom.value > yearTo.value) {
+  error.value = "From year cannot be later than To year.";
+  return;
+}
+
   if (!query.value.trim()) return;
 
   loading.value = true;
@@ -84,6 +71,11 @@ function openPreview(id) {
   showPreview.value = true;
 }
 
+function downloadFile(filename) {
+  if (!metadata.value.filename) return;
+  window.open(`http://127.0.0.1:8000/uploads/${filename}`, "_blank");
+}
+
 </script>
 
 <template>
@@ -103,19 +95,33 @@ function openPreview(id) {
         class="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
       />
 
-<input
-  type="number"
-  v-model="yearFrom"
-  placeholder="From year"
-  class="p-3 border rounded-lg w-40 focus:ring-2 focus:ring-green-500"
-/>
+      <select
+        v-model="yearFrom"
+        class="p-3 border rounded-lg w-40 focus:ring-2 focus:ring-green-500"
+      >
+        <option :value="null">From year</option>
+        <option
+          v-for="y in years"
+          :key="'from-' + y"
+          :value="y"
+        >
+          {{ y }}
+        </option>
+      </select>
 
-<input
-  type="number"
-  v-model="yearTo"
-  placeholder="To year"
-  class="p-3 border rounded-lg w-40 focus:ring-2 focus:ring-green-500"
-/>
+      <select
+        v-model="yearTo"
+        class="p-3 border rounded-lg w-40 focus:ring-2 focus:ring-green-500"
+      >
+        <option :value="null">To year</option>
+        <option
+          v-for="y in years"
+          :key="'to-' + y"
+          :value="y"
+        >
+          {{ y }}
+        </option>
+      </select>
 
 
       <button

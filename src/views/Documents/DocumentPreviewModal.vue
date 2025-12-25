@@ -15,9 +15,19 @@
       </button>
 
       <!-- Filename -->
-      <h2 class="text-xl font-bold mb-2 flex-shrink-0">
-        {{ metadata.filename || "Document Preview" }}
-      </h2>
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-xl font-bold">{{ metadata.filename }}</h2>
+
+        <!-- DOWNLOAD BUTTON (ROLE-BASED) -->
+        <button
+          v-if="['Admin', 'Uploader', 'Faculty', 'Staff'].includes(role)"
+          @click="downloadDocument"
+          class="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
+        >
+          Download
+        </button>
+    </div>
+
 
       <div class="flex-1 overflow-y-auto pr-2">
       <!-- Loading -->
@@ -116,6 +126,7 @@
 import { ref, watch, onUnmounted } from "vue";
 import api from "@/api";
 import VuePdfEmbed from "vue-pdf-embed";
+import { computed } from "vue";
 
 /* Props */
 const props = defineProps({
@@ -128,6 +139,7 @@ const props = defineProps({
   }
 });
 
+const role = computed(() => localStorage.getItem("role"));
 
 const emit = defineEmits(["close"]);
 
@@ -202,6 +214,19 @@ watch(() => props.docId, async (id) => {
     isLoading.value = false;
   }
 });
+
+
+/* Download */
+
+function downloadDocument() {
+  const token = localStorage.getItem("token");
+
+  if (!token || !props.docId) return;
+
+  const url = `http://127.0.0.1:8000/documents/download/${props.docId}?token=${token}`;
+  window.open(url, "_blank");
+}
+
 
 /* Cleanup */
 onUnmounted(() => {
