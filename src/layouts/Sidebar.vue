@@ -42,6 +42,11 @@ const role = ref(localStorage.getItem("role"));
           Administration
         </p>
 
+
+        <router-link  v-if="role === 'Admin'" to="/admin/download-requests" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">
+            <i class="pi pi-download text-dns_light text-lg"></i> Download Requests
+        </router-link>
+
         <router-link
           to="/users"
           class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"

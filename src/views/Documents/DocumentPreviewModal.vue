@@ -18,14 +18,24 @@
       <div class="flex justify-between items-center mb-3">
         <h2 class="text-xl font-bold">{{ metadata.filename }}</h2>
 
-        <!-- DOWNLOAD BUTTON (ROLE-BASED) -->
-        <button
-          v-if="['Admin', 'Uploader', 'Faculty', 'Staff'].includes(role)"
-          @click="downloadDocument"
-          class="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
-        >
-          Download
-        </button>
+      <!-- DOWNLOAD -->
+<button
+  v-if="['Admin','Uploader','Faculty','Staff'].includes(role)"
+  @click="downloadDocument"
+  class="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800"
+>
+  Download
+</button>
+
+<!-- REQUEST DOWNLOAD (VIEWER ONLY) -->
+<button
+  v-else-if="role === 'Viewer'"
+  @click="openRequestModal"
+  class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+>
+  Request Download
+</button>
+
     </div>
 
 
@@ -115,6 +125,43 @@
           <strong>Type:</strong> {{ metadata.document_type }}
         </p>
       </div>
+
+
+
+
+      <div v-if="showRequestModal"
+     class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+
+  <div class="bg-white p-6 rounded-lg w-96 shadow-lg">
+    <h3 class="text-lg font-semibold mb-3">
+      Request Download
+    </h3>
+
+    <textarea
+      v-model="requestReason"
+      placeholder="Reason for requesting this document (optional)"
+      class="w-full p-2 border rounded mb-4"
+      rows="3"
+    />
+
+    <div class="flex justify-end gap-2">
+      <button
+        @click="showRequestModal = false"
+        class="px-4 py-2 bg-gray-300 rounded"
+      >
+        Cancel
+      </button>
+
+      <button
+        @click="submitDownloadRequest"
+        class="px-4 py-2 bg-green-700 text-white rounded"
+      >
+        Submit
+      </button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 
@@ -153,6 +200,10 @@ const isPDF = ref(false);
 const isText = ref(false);
 const isUnsupported = ref(false);
 const isLoading = ref(false);
+
+
+const showRequestModal = ref(false);
+const requestReason = ref("");
 
 /* Watch document change */
 watch(() => props.docId, async (id) => {
@@ -226,6 +277,27 @@ function downloadDocument() {
   const url = `http://127.0.0.1:8000/documents/download/${props.docId}?token=${token}`;
   window.open(url, "_blank");
 }
+
+
+async function submitDownloadRequest() {
+  try {
+    await api.post(`/documents/${props.docId}/request-download`, {
+      reason: requestReason.value
+    });
+
+    showRequestModal.value = false;
+    requestReason.value = "";
+
+    alert("Download request submitted successfully.");
+  } catch (err) {
+    alert("Failed to submit request.");
+  }
+}
+
+function openRequestModal() {
+  showRequestModal.value = true;
+}
+
 
 
 /* Cleanup */

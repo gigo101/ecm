@@ -111,6 +111,13 @@ const routes = [
   meta: { requiresAuth: true, requiresAdmin: true }
 }
 ,
+
+{
+  path: "/admin/download-requests",
+  component: () => import("@/views/Documents/AdminDownloadRequests.vue"),
+  meta: { requiresAdmin: true }
+}
+,
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',

@@ -152,6 +152,18 @@ class DocumentLog(Base):
     accessed_at = Column(DateTime, default=datetime.utcnow)
 
 
+class DownloadRequest(Base):
+    __tablename__ = "download_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, index=True)
+    document_name = Column(String(255))
+    requester_email = Column(String(255))
+    reason = Column(Text, nullable=True)
+    status = Column(String(20), default="PENDING")  # PENDING | APPROVED | REJECTED
+    requested_at = Column(DateTime, default=datetime.utcnow)
+
+
 Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
 def get_db():
@@ -1189,3 +1201,113 @@ async def get_document_logs(
         })
 
     return result
+
+
+
+
+class DownloadRequestCreate(BaseModel):
+    reason: str | None = None
+
+
+@app.post("/documents/{doc_id}/request-download")
+async def request_download(
+    doc_id: int,
+    data: DownloadRequestCreate,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Only Viewer can request
+    if current_user.role != "Viewer":
+        raise HTTPException(403, "Only viewers can request downloads")
+
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    req = DownloadRequest(
+        document_id=doc.id,
+        document_name=doc.filename,
+        requester_email=current_user.email,
+        reason=data.reason
+    )
+
+    db.add(req)
+    db.commit()
+
+    return {"message": "Download request submitted"}
+
+
+@app.get("/admin/download-requests")
+async def list_download_requests(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    requests = db.query(DownloadRequest).order_by(
+        DownloadRequest.requested_at.desc()
+    ).all()
+
+    return [
+        {
+            "id": r.id,
+            "document_id": r.document_id,
+            "document_name": r.document_name,
+            "requester_email": r.requester_email,
+            "reason": r.reason,
+            "status": r.status,
+            "requested_at": r.requested_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for r in requests
+    ]
+
+
+@app.put("/admin/download-requests/{request_id}")
+async def update_download_request(
+    request_id: int,
+    status: str = Query(..., regex="^(APPROVED|REJECTED)$"),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    req = db.query(DownloadRequest).filter(
+        DownloadRequest.id == request_id
+    ).first()
+
+    if not req:
+        raise HTTPException(404, "Request not found")
+
+    req.status = status
+    req.reviewed_at = datetime.utcnow()
+    req.reviewed_by = current_user.email
+
+    db.commit()
+
+    return {"message": f"Request {status.lower()} successfully"}
+
+
+
+@app.get("/documents/my-download-requests")
+async def my_download_requests(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    requests = (
+        db.query(DownloadRequest)
+        .filter(DownloadRequest.requester_email == current_user.email)
+        .order_by(DownloadRequest.requested_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": r.id,
+            "document_id": r.document_id,
+            "document_name": r.document_name,
+            "reason": r.reason,
+            "status": r.status,
+            "requested_at": r.requested_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for r in requests
+    ]
