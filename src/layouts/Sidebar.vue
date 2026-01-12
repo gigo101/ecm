@@ -36,6 +36,12 @@ const role = ref(localStorage.getItem("role"));
         Semantic Search
       </router-link>
 
+      <router-link to="/my-download-requests" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">
+        <i class="pi 
+          pi-arrow-circle-down"></i> Download Requests
+      </router-link>
+
+
       <!-- ADMIN SECTION -->
       <div v-if="role === 'Admin'" class="mt-6">
         <p class="text-xs uppercase text-gray-300 px-3 mb-2 tracking-wide">
