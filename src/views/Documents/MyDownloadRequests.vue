@@ -26,6 +26,12 @@ function downloadDocument(docId) {
     `http://127.0.0.1:8000/documents/download/${docId}?token=${token}`,
     "_blank"
   );
+
+  // ⏳ Small delay to allow backend to mark as downloaded
+  setTimeout(() => {
+    loadRequests(); // refresh list
+  }, 800);
+
 }
 
 onMounted(loadRequests);

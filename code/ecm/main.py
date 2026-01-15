@@ -162,7 +162,7 @@ class DownloadRequest(Base):
     reason = Column(Text, nullable=True)
     status = Column(String(20), default="PENDING")  # PENDING | APPROVED | REJECTED
     requested_at = Column(DateTime, default=datetime.utcnow)
-
+    downloaded_at = Column(DateTime, nullable=True)  # ✅ ADD THIS
 
 Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
@@ -760,6 +760,26 @@ async def download_document(
     if document.document_type == "Confidential" and user.role in ["Faculty", "Staff"]:
         raise HTTPException(status_code=403, detail="You are not allowed to download this file")
 
+    #newcode
+    # 🔒 VIEWER ONE-TIME DOWNLOAD ENFORCEMENT
+    if user.role == "Viewer":
+        req = db.query(DownloadRequest).filter(
+            DownloadRequest.document_id == document.id,
+            DownloadRequest.requester_email == user.email,
+            DownloadRequest.status == "APPROVED",
+            DownloadRequest.downloaded_at == None
+    ).first()
+
+    if not req:
+        raise HTTPException(
+            status_code=403,
+            detail="Download request not approved or already used"
+        )
+
+    # ✅ Mark as used (one-time only)
+    req.downloaded_at = datetime.utcnow()
+    db.commit()
+
     # ✅ LOG DOWNLOAD
     log = DocumentLog(
         document_id=document.id,
@@ -1293,12 +1313,25 @@ async def my_download_requests(
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # requests = (
+    #     db.query(DownloadRequest)
+    #     .filter(DownloadRequest.requester_email == current_user.email)
+    #     .order_by(DownloadRequest.requested_at.desc())
+    #     .all()
+    # )
+
+
+    #new
     requests = (
-        db.query(DownloadRequest)
-        .filter(DownloadRequest.requester_email == current_user.email)
-        .order_by(DownloadRequest.requested_at.desc())
-        .all()
+    db.query(DownloadRequest)
+    .filter(
+        DownloadRequest.requester_email == current_user.email,
+        DownloadRequest.downloaded_at == None   # 👈 hide used
     )
+    .order_by(DownloadRequest.requested_at.desc())
+    .all()
+    )
+
 
     return [
         {
