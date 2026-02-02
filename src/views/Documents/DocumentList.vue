@@ -13,7 +13,7 @@ const previewId = ref(null);
 const toast = useToast();
 
 const role = ref(localStorage.getItem("role")); // ROLE STORED HERE
-const activeTab = ref("all"); // all | mine
+// const activeTab = ref("all"); // all | mine
 
 // Fetch all documents
 async function fetchDocuments() {
@@ -21,24 +21,20 @@ async function fetchDocuments() {
   error.value = "";
 
   try {
-    const url =
-      activeTab.value === "mine"
-        ? "/documents/my-uploads"
-        : "/documents/list";
-
-    const res = await api.get(url);
+    const res = await api.get("/documents/list");
     documents.value = res.data;
-  } catch (err) {
+  } catch {
     error.value = "Unable to load documents.";
   } finally {
     loading.value = false;
   }
 }
 
-function switchTab(tab) {
-  activeTab.value = tab;
-  fetchDocuments();
-}
+
+// function switchTab(tab) {
+//   activeTab.value = tab;
+//   fetchDocuments();
+// }
 
 // Search filter
 function filteredDocuments() {
@@ -98,29 +94,7 @@ onMounted(() => {
         Upload
       </router-link>
     </div>
-<div  v-if="role === 'Admin' || role === 'Uploader'" class="flex gap-4 mb-4">
-  <button
-    @click="switchTab('all')"
-    :class="activeTab === 'all'
-      ? 'bg-green-700 text-white'
-      : 'bg-gray-200 text-gray-700'"
-    class="px-4 py-2 rounded"
-  >
-    All Documents
-  </button>
 
-  <!-- Admin & Uploader only -->
-<button
-  @click="switchTab('mine')"
-  :class="activeTab === 'mine'
-    ? 'bg-green-700 text-white'
-    : 'bg-gray-200'"
-  class="px-4 py-2 rounded"
->
-  My Uploads
-</button>
-
-</div>
 
     <!-- Search bar -->
     <input
@@ -188,16 +162,7 @@ onMounted(() => {
               </button>
             </div>
           </td>
-          <td class="p-3 text-center">
-            <!-- FIXED ROLE CHECK -->
-            <button
-              v-if="role === 'Admin' || (role === 'Uploader' && activeTab=== 'mine')")
-              @click="deleteDocument(doc.id)"
-              class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Delete
-            </button>
-          </td>
+ 
         </tr>
       </tbody>
     </table>

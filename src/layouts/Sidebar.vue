@@ -28,6 +28,15 @@ const role = ref(localStorage.getItem("role"));
       >  <i class="pi pi-file text-dns_light text-lg"></i>
         Documents
       </router-link>
+
+      <router-link
+        v-if="role === 'Admin' || role === 'Uploader'"
+        to="/documents/my-uploads"  class="flex items-center gap-3 p-3 rounded hover:bg-dns_green"
+      >
+        <i class="pi pi-file-pdf text-dns_light text-lg"></i>
+        My Uploads
+      </router-link>
+
       <router-link
         to="/semantic-search"
         class="flex items-center gap-2 px-4 py-2 hover:bg-dns_green"

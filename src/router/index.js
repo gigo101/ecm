@@ -45,6 +45,12 @@ const routes = [
   name: "Documents",
   component: DocumentList
 },
+{
+  path: "/documents/my-uploads",
+  name: "MyUploads",
+  component: () => import("@/views/Documents/MyUploads.vue"),
+  meta: { requiresAuth: true }
+},
 { 
     path: '/search', 
     component: Search 
