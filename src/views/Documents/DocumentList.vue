@@ -13,7 +13,7 @@ const previewId = ref(null);
 const toast = useToast();
 
 const role = ref(localStorage.getItem("role")); // ROLE STORED HERE
-// const activeTab = ref("all"); // all | mine
+
 
 // Fetch all documents
 async function fetchDocuments() {
@@ -30,11 +30,6 @@ async function fetchDocuments() {
   }
 }
 
-
-// function switchTab(tab) {
-//   activeTab.value = tab;
-//   fetchDocuments();
-// }
 
 // Search filter
 function filteredDocuments() {

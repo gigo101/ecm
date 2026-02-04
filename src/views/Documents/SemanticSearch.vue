@@ -23,6 +23,17 @@ const props = defineProps({
   query: String,
 });
 
+const categories = [
+  "Administrative",
+  "Academics",
+  "Research",
+  "Policies",
+  "Official Issuances",
+  "News & Events"
+];
+
+const category = ref(null);
+
 
 const currentYear = new Date().getFullYear();
 
@@ -50,6 +61,7 @@ if (yearFrom.value && yearTo.value && yearFrom.value > yearTo.value) {
     // Build params object safely
     const params = { query: query.value };
 
+    if (category.value) params.category = category.value;
     if (yearFrom.value) params.year_from = Number(yearFrom.value);
     if (yearTo.value) params.year_to = Number(yearTo.value);
 
@@ -120,6 +132,20 @@ function downloadFile(filename) {
           :value="y"
         >
           {{ y }}
+        </option>
+      </select>
+
+      <select
+        v-model="category"
+        class="p-3 border rounded-lg w-52 focus:ring-2 focus:ring-green-500"
+      >
+        <option :value="null">All Categories</option>
+        <option
+          v-for="c in categories"
+          :key="c"
+          :value="c"
+        >
+          {{ c }}
         </option>
       </select>
 

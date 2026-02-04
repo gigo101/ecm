@@ -1055,6 +1055,7 @@ async def my_uploads(
 @app.get("/documents/semantic-search")
 async def semantic_search(
     query: str,
+    category: str | None = None,   # 👈 ADD
     year_from: int | None = None,
     year_to: int | None = None,
     db: Session = Depends(get_db),
@@ -1080,6 +1081,9 @@ async def semantic_search(
 
     if year_to is not None:
         doc_query = doc_query.filter(Document.year_approved <= year_to)
+
+    if category:
+        doc_query = doc_query.filter(Document.category == category)
 
     docs = doc_query.all()
     results = []
