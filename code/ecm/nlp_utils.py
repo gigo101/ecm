@@ -1,3 +1,19 @@
+import os
+from pydoc import doc
+import pdfplumber
+import docx
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+from transformers import pipeline
+
+summarizer = pipeline(
+    "summarization",
+    model="facebook/bart-large-cnn",
+    device=-1  # CPU (use 0 if GPU)
+)
+
+
 import fitz  # PyMuPDF
 import docx
 import pytesseract
@@ -7,43 +23,40 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import spacy
 
-def extract_text_from_file(filepath: str):
-    # PDF
-    if filepath.lower().endswith(".pdf"):
-        doc = fitz.open(filepath)
-        text = ""
 
-        for page in doc:
-            # Try normal text extraction first
-            extracted = page.get_text().strip()
-            
-            if extracted:
-                text += extracted + "\n"
-            else:
-                # OCR fallback for scanned PDFs
-                pix = page.get_pixmap()
-                img_bytes = pix.tobytes("png")
-                img = Image.open(io.BytesIO(img_bytes))
-                ocr_text = pytesseract.image_to_string(img)
-                text += ocr_text + "\n"
+def extract_text_from_file(filepath: str) -> str:
+    """
+    Extract text from PDF, DOCX, or TXT files.
+    """
+    if not filepath or not os.path.exists(filepath):
+        return ""
 
-        return text
+    ext = os.path.splitext(filepath)[1].lower()
 
-    # DOCX
-    if filepath.lower().endswith(".docx"):
-        document = docx.Document(filepath)
-        return "\n".join([para.text for para in document.paragraphs])
-
-    # Images (JPG, PNG, TIFF)
-    if filepath.lower().endswith((".png", ".jpg", ".jpeg", ".tiff")):
-        img = Image.open(filepath)
-        return pytesseract.image_to_string(img)
-
-    # TXT
     try:
-        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-            return f.read()
-    except:
+        # 📄 PDF
+        if ext == ".pdf":
+            text = ""
+            with pdfplumber.open(filepath) as pdf:
+                for page in pdf.pages:
+                    text += page.extract_text() or ""
+            return text
+
+        # 📝 DOCX
+        elif ext == ".docx":
+            doc = docx.Document(filepath)
+            return "\n".join(p.text for p in doc.paragraphs)
+
+        # 📃 TXT
+        elif ext == ".txt":
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read()
+
+        else:
+            return ""
+
+    except Exception as e:
+        print(f"[extract_text_from_file ERROR] {e}")
         return ""
 
 
@@ -198,6 +211,59 @@ def classify_document(text: str):
         return "General"
 
     return best_category
+
+
+
+def generate_summary(text: str, query: str, embedder, top_k: int = 3):
+    """
+    Query-focused extractive summary
+    """
+    if not text.strip():
+        return ""
+
+    sentences = [s.strip() for s in text.split(".") if len(s.strip()) > 40]
+
+    if not sentences:
+        return ""
+
+    query_embedding = embedder.encode(query).reshape(1, -1)
+    sentence_embeddings = embedder.encode(sentences)
+
+    scores = cosine_similarity(query_embedding, sentence_embeddings)[0]
+
+    ranked = sorted(
+        zip(sentences, scores),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    summary_sentences = [s for s, _ in ranked[:top_k]]
+
+    return ". ".join(summary_sentences) + "."
+
+
+def generate_abstractive_summary(text: str, max_chars: int = 3000):
+    """
+    Generate an abstractive summary of a document.
+    """
+
+    if not text or len(text.strip()) < 200:
+        return ""
+
+    # Truncate safely (BART max tokens ~1024)
+    text = text[:max_chars]
+
+    try:
+        result = summarizer(
+            text,
+            max_length=150,
+            min_length=60,
+            do_sample=False
+        )
+        return result[0]["summary_text"]
+    except Exception as e:
+        print("Summary error:", e)
+        return ""
 
 
 

@@ -1,3 +1,18 @@
+# main.py (top-level)
+import os
+from pydoc import doc
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+# from transformers import pipeline
+
+# summarizer = pipeline(
+#     "summarization",
+#     model="facebook/bart-large-cnn",
+#     device=-1  # CPU (use 0 if GPU)
+# )
+
+
+
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from pydantic import BaseModel
@@ -20,6 +35,9 @@ from sentence_transformers import SentenceTransformer
 from nlp_utils import get_relevant_sentences
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+# from nlp_utils import generate_summary
+from nlp_utils import generate_abstractive_summary
+
 
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -105,6 +123,7 @@ class Document(Base):
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     embedding = Column(JSON)  # ⭐ ADD THIS
+    summary = Column(Text, nullable=True)
 
 
 # --- TOKEN SCHEMA ---
@@ -376,9 +395,11 @@ async def upload_document(
         file_text = extract_text_from_file(file_location)
         combined_text = f"{description}\n{file_text}"
         category = classify_document(combined_text)
+        summary = generate_abstractive_summary(file_text)
     else:
         # Still extract text for embeddings even if category is manual
         file_text = extract_text_from_file(file_location)
+        summary = generate_abstractive_summary(file_text)
 
     # =====================================================
     # ⭐ STEP 4 — GENERATE SEMANTIC EMBEDDING (PUT HERE)
@@ -386,7 +407,7 @@ async def upload_document(
     embedding = embedder.encode(
         file_text[:5000] if file_text else f"{description} {file.filename}"
     ).tolist()
-
+    print("EMBEDDING LENGTH", len(embedding))
     # ✅ 6. Save document record with updated filename
     document = Document(
         filename=new_filename,
@@ -396,7 +417,9 @@ async def upload_document(
         year_approved=year_approved,
         document_type=document_type,
         uploaded_by=current_user.email,
-        embedding=embedding  # ⭐ SAVE EMBEDDING
+        embedding=embedding,  # ⭐ SAVE EMBEDDING
+        summary = summary
+
     )
 
     db.add(document)
@@ -1095,6 +1118,8 @@ async def semantic_search(
         doc_embedding = np.array(doc.embedding).reshape(1, -1)
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
 
+
+
         if score >= 0.35:
             results.append({
                 "id": doc.id,
@@ -1105,7 +1130,8 @@ async def semantic_search(
                 "document_type": doc.document_type,
                 "uploaded_by": doc.uploaded_by,
                 "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-                "score": round(float(score), 3)
+                "score": round(float(score), 3),
+                "summary": doc.summary # ✅ ADD SUMMARY
             })
 
     results.sort(key=lambda x: x["score"], reverse=True)
