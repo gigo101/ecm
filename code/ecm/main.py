@@ -21,6 +21,9 @@ from nlp_utils import get_relevant_sentences
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from sqlalchemy import func
+from fastapi.responses import FileResponse
+from fastapi import HTTPException, Depends
+import mimetypes
 
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -697,6 +700,10 @@ async def update_user_status(
         
 #         )
 
+from fastapi.responses import FileResponse
+from fastapi import HTTPException, Depends
+import mimetypes
+
 @app.get("/documents/preview/{doc_id}")
 async def preview_document(
     doc_id: int,
@@ -704,21 +711,26 @@ async def preview_document(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    # 🔎 Get document
     document = db.query(Document).filter(Document.id == doc_id).first()
+
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Viewer → Public only
+    # 🔐 RBAC — VIEWER → Public only
     if current_user.role == "Viewer" and document.document_type != "Public":
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # Faculty & Staff → no Confidential
+    # 🔐 RBAC — Faculty & Staff → no Confidential
     if document.document_type == "Confidential" and current_user.role in ["Faculty", "Staff"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
-  # ✅ LOG VIEW
+    # 🧠 Detect correct MIME type (PDF / image / others)
+    mime_type, _ = mimetypes.guess_type(document.filepath)
+
+    # 📝 LOG VIEW
     log = DocumentLog(
-        document_id=doc_id,
+        document_id=document.id,
         user_email=current_user.email,
         action="VIEW",
         source=source.upper()
@@ -726,11 +738,15 @@ async def preview_document(
     db.add(log)
     db.commit()
 
+    # 📂 Return file for inline preview
     return FileResponse(
         path=document.filepath,
-        media_type="application/pdf",
-        headers={"Content-Disposition": "inline"},
+        media_type=mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": "inline"
+        }
     )
+
 
 
 from fastapi import Query
@@ -738,7 +754,7 @@ from fastapi import Query
 @app.get("/documents/download/{doc_id}")
 async def download_document(
     doc_id: int,
-    token: str = Query(None),   # 👈 accept token from query
+    token: str = Query(None),
     db: Session = Depends(get_db)
 ):
     if not token:
@@ -758,39 +774,40 @@ async def download_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    if not os.path.exists(document.filepath):
+        raise HTTPException(status_code=404, detail="File missing on server")
+
     # 🔐 RBAC
     if user.role == "Viewer" and document.document_type != "Public":
-        raise HTTPException(status_code=403, detail="You are not allowed to download this file")
+        raise HTTPException(status_code=403, detail="Not allowed")
 
     if document.document_type == "Confidential" and user.role in ["Faculty", "Staff"]:
-        raise HTTPException(status_code=403, detail="You are not allowed to download this file")
+        raise HTTPException(status_code=403, detail="Not allowed")
 
-    #newcode
-    # 🔒 VIEWER ONE-TIME DOWNLOAD ENFORCEMENT
+    # ✅ VIEWER REQUEST CHECK
     if user.role == "Viewer":
         req = db.query(DownloadRequest).filter(
             DownloadRequest.document_id == document.id,
             DownloadRequest.requester_email == user.email,
             DownloadRequest.status == "APPROVED",
             DownloadRequest.downloaded_at == None
-    ).first()
+        ).first()
 
-    if not req:
-        raise HTTPException(
-            status_code=403,
-            detail="Download request not approved or already used"
-        )
+        if not req:
+            raise HTTPException(
+                status_code=403,
+                detail="Download request not approved or already used"
+            )
 
-    # ✅ Mark as used (one-time only)
-    req.downloaded_at = datetime.utcnow()
-    db.commit()
+        req.downloaded_at = datetime.utcnow()
+        db.commit()
 
     # ✅ LOG DOWNLOAD
     log = DocumentLog(
         document_id=document.id,
         user_email=user.email,
         action="DOWNLOAD",
-        source="PREVIEW"
+        source="REQUEST"
     )
     db.add(log)
     db.commit()
@@ -798,10 +815,7 @@ async def download_document(
     return FileResponse(
         path=document.filepath,
         filename=document.filename,
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f'attachment; filename="{document.filename}"'
-        }
+        media_type="application/octet-stream"
     )
 
 

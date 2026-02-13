@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { ref, computed, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import api from "@/api";
@@ -8,6 +8,8 @@ const router = useRouter();
 const toast = useToast();
 
 const selectedFile = ref(null);
+const previewUrl = ref(null);
+
 const description = ref("");
 const category = ref("Auto");
 const yearApproved = ref(new Date().getFullYear());
@@ -15,11 +17,36 @@ const error = ref("");
 const loading = ref(false);
 const documentType = ref("Public");
 
+// Detect file type
+const isPDF = computed(() => selectedFile.value?.type === "application/pdf");
+const isImage = computed(() => selectedFile.value?.type.startsWith("image/"));
 
+// Handle file
 function handleFileChange(e) {
-  selectedFile.value = e.target.files[0];
+  const file = e.target.files[0];
+  if (!file) return;
+
+  selectedFile.value = file;
+
+  // Revoke old preview
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value);
+  }
+
+  previewUrl.value = URL.createObjectURL(file);
 }
 
+// Remove file
+function removeFile() {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value);
+  }
+
+  selectedFile.value = null;
+  previewUrl.value = null;
+}
+
+// Upload
 async function uploadDocument() {
   error.value = "";
 
@@ -38,36 +65,31 @@ async function uploadDocument() {
   loading.value = true;
 
   try {
-    await api.post("/documents/upload", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    await api.post("/documents/upload", formData);
 
-    //SHOW TOAST
     toast.success("Document uploaded successfully!");
 
-    //RESET FORM
-    selectedFile.value = null;
+    removeFile();
     description.value = "";
     category.value = "Auto";
     documentType.value = "Public";
 
-    //REDIRECT TO /documents AFTER SHORT DELAY
-    setTimeout(() => {
-      router.push("/documents");
-    }, 1200);
+    setTimeout(() => router.push("/documents"), 1200);
 
   } catch (err) {
-    console.error("Upload failed:", err);
     error.value = err.response?.data?.detail || "Upload error";
-
     toast.error(error.value);
   } finally {
     loading.value = false;
   }
 }
+
+// Cleanup on destroy
+onUnmounted(() => {
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
+});
 </script>
+
 
 <template>
   <div class="p-8">
@@ -79,6 +101,42 @@ async function uploadDocument() {
         @change="handleFileChange"
         class="p-2 border rounded w-full"
       />
+
+            <!-- FILE PREVIEW -->
+      <div v-if="selectedFile" class="border rounded-lg p-4 bg-gray-50 space-y-3">
+
+        <div class="flex justify-between items-center">
+          <span class="font-medium">{{ selectedFile.name }}</span>
+
+          <button
+            @click="removeFile"
+            class="text-red-600 text-sm"
+          >
+            Remove
+          </button>
+        </div>
+
+        <!-- PDF PREVIEW -->
+        <iframe
+          v-if="isPDF"
+          :src="previewUrl"
+          class="w-full h-[400px] border rounded"
+        />
+
+        <!-- IMAGE PREVIEW -->
+        <img
+          v-else-if="isImage"
+          :src="previewUrl"
+          class="max-h-[400px] mx-auto rounded shadow"
+        />
+
+        <!-- OTHER FILE -->
+        <div v-else class="text-gray-500 text-sm">
+          Preview not available for this file type.
+        </div>
+
+      </div>
+
 
       <textarea
         v-model="description"

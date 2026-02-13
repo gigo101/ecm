@@ -4,16 +4,29 @@ import api from "@/api";
 import { useToast } from "vue-toastification";
 
 const toast = useToast();
+
 const requests = ref([]);
 const loading = ref(true);
+const error = ref("");
 
+/* 📥 Load requests */
 async function loadRequests() {
   loading.value = true;
-  const res = await api.get("/documents/my-download-requests");
-  requests.value = res.data;
-  loading.value = false;
+  error.value = "";
+
+  try {
+    const res = await api.get("/documents/my-download-requests");
+    requests.value = res.data;
+  } catch (err) {
+    console.error(err);
+    error.value = "Failed to load download requests.";
+    toast.error(error.value);
+  } finally {
+    loading.value = false;
+  }
 }
 
+/* ⬇ Download approved file */
 function downloadDocument(docId) {
   const token = localStorage.getItem("token");
 
@@ -22,16 +35,24 @@ function downloadDocument(docId) {
     return;
   }
 
-  window.open(
-    `http://127.0.0.1:8000/documents/download/${docId}?token=${token}`,
-    "_blank"
-  );
+  const downloadUrl = `http://127.0.0.1:8000/documents/download/${docId}?token=${token}`;
 
-  // ⏳ Small delay to allow backend to mark as downloaded
+  // ✅ use same tab navigation (no async extension warning)
+  window.location.href = downloadUrl;
+
+  // ⏳ refresh list after backend marks as used
   setTimeout(() => {
-    loadRequests(); // refresh list
+    loadRequests();
   }, 800);
+}
 
+/* 🎨 Status color helper */
+function statusClass(status) {
+  return {
+    PENDING: "text-yellow-600",
+    APPROVED: "text-green-600",
+    REJECTED: "text-red-600"
+  }[status] || "text-gray-500";
 }
 
 onMounted(loadRequests);
@@ -43,9 +64,29 @@ onMounted(loadRequests);
       My Download Requests
     </h1>
 
-    <div v-if="loading">Loading...</div>
+    <!-- 🔄 Loading -->
+    <div v-if="loading" class="text-gray-600">
+      Loading requests...
+    </div>
 
-    <table v-else class="w-full bg-white shadow rounded-lg">
+    <!-- ❌ Error -->
+    <div v-else-if="error" class="text-red-600">
+      {{ error }}
+    </div>
+
+    <!-- 📭 Empty -->
+    <div
+      v-else-if="requests.length === 0"
+      class="text-gray-500 text-center mt-10"
+    >
+      No download requests found.
+    </div>
+
+    <!-- 📄 Table -->
+    <table
+      v-else
+      class="w-full bg-white shadow rounded-lg overflow-hidden"
+    >
       <thead class="bg-green-700 text-white">
         <tr>
           <th class="p-3 text-left">Document</th>
@@ -57,19 +98,25 @@ onMounted(loadRequests);
       </thead>
 
       <tbody>
-        <tr v-for="r in requests" :key="r.id" class="border-b">
-          <td class="p-3">{{ r.document_name }}</td>
-          <td class="p-3">{{ r.reason || "—" }}</td>
-          <td class="p-3">{{ r.requested_at }}</td>
+        <tr
+          v-for="r in requests"
+          :key="r.id"
+          class="border-b hover:bg-gray-50"
+        >
+          <td class="p-3 font-medium">
+            {{ r.document_name }}
+          </td>
+
+          <td class="p-3">
+            {{ r.reason || "—" }}
+          </td>
+
+          <td class="p-3">
+            {{ r.requested_at }}
+          </td>
 
           <td class="p-3 font-semibold">
-            <span
-              :class="{
-                'text-yellow-600': r.status === 'PENDING',
-                'text-green-600': r.status === 'APPROVED',
-                'text-red-600': r.status === 'REJECTED'
-              }"
-            >
+            <span :class="statusClass(r.status)">
               {{ r.status }}
             </span>
           </td>
@@ -78,7 +125,7 @@ onMounted(loadRequests);
             <button
               v-if="r.status === 'APPROVED'"
               @click="downloadDocument(r.document_id)"
-              class="px-4 py-2 bg-green-700 text-white rounded"
+              class="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800"
             >
               Download
             </button>
