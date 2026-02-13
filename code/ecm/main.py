@@ -432,19 +432,23 @@ async def list_documents(
 
     docs = query.order_by(Document.uploaded_at.desc()).all()
 
-    return [
-        {
+    result = []
+
+    for d in docs:
+        uploader = db.query(User).filter(User.email == d.uploaded_by).first()
+
+        result.append({
             "id": d.id,
             "filename": d.filename,
             "description": d.description,
             "category": d.category,
             "year_approved": d.year_approved,
             "document_type": d.document_type,
-            "uploaded_by": d.uploaded_by,
+            "uploaded_by": uploader.office if uploader else d.uploaded_by,  # ⭐ CHANGE
             "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-        }
-        for d in docs
-    ]
+        })
+
+    return result
 
 
 
@@ -972,21 +976,22 @@ async def my_uploads(
         .all()
     )
 
-    return [
-        {
+    result = []
+
+    for d in docs:
+        uploader = db.query(User).filter(User.email == d.uploaded_by).first()
+
+        result.append({
             "id": d.id,
             "filename": d.filename,
             "description": d.description,
             "category": d.category,
             "document_type": d.document_type,
-            "uploaded_by": d.uploaded_by,
+            "uploaded_by": uploader.office if uploader else d.uploaded_by,
             "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-        }
-        for d in docs
-    ]
+        })
 
-
-
+    return result
 
 # @app.get("/documents/semantic-search")
 # async def semantic_search(
