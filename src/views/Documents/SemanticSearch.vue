@@ -17,6 +17,19 @@ const yearTo = ref(null);
 const role = ref(localStorage.getItem("role"));
 
 
+const category = ref("");
+
+const categories = [
+  "General",
+  "Administrative",
+  "Academics",
+  "Research",
+  "Policies",
+  "Official Issuances",
+  "News & Events"
+];
+
+
 const props = defineProps({
   show: Boolean,
   docId: Number,
@@ -34,11 +47,10 @@ const years = Array.from(
 
 async function runSemanticSearch() {
 
-
-if (yearFrom.value && yearTo.value && yearFrom.value > yearTo.value) {
-  error.value = "From year cannot be later than To year.";
-  return;
-}
+  if (yearFrom.value && yearTo.value && yearFrom.value > yearTo.value) {
+    error.value = "From year cannot be later than To year.";
+    return;
+  }
 
   if (!query.value.trim()) return;
 
@@ -47,15 +59,19 @@ if (yearFrom.value && yearTo.value && yearFrom.value > yearTo.value) {
   results.value = [];
 
   try {
-    // Build params object safely
     const params = { query: query.value };
 
     if (yearFrom.value) params.year_from = Number(yearFrom.value);
     if (yearTo.value) params.year_to = Number(yearTo.value);
 
+    if (category.value && category.value !== "") {
+      params.category = category.value;
+    }
+
     const res = await api.get("/documents/semantic-search", { params });
 
     results.value = res.data;
+
   } catch (err) {
     console.error(err);
     error.value = "Semantic search failed.";
@@ -63,6 +79,7 @@ if (yearFrom.value && yearTo.value && yearFrom.value > yearTo.value) {
     loading.value = false;
   }
 }
+
 
 function openPreview(id) {
   previewId.value = id;
@@ -123,6 +140,18 @@ function downloadFile(filename) {
         </option>
       </select>
 
+      <select v-model="category" class="p-3 border rounded-lg w-52 focus:ring-2 focus:ring-green-500"
+    >
+      <option value="">All Categories</option>
+
+      <option
+        v-for="c in categories"
+        :key="c"
+        :value="c"
+      >
+        {{ c }}
+      </option>
+      </select>
 
       <button
         @click="runSemanticSearch"

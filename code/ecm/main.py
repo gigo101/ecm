@@ -20,6 +20,7 @@ from sentence_transformers import SentenceTransformer
 from nlp_utils import get_relevant_sentences
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+from sqlalchemy import func
 
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -1055,6 +1056,7 @@ async def my_uploads(
 @app.get("/documents/semantic-search")
 async def semantic_search(
     query: str,
+    category: str | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
     db: Session = Depends(get_db),
@@ -1080,6 +1082,11 @@ async def semantic_search(
 
     if year_to is not None:
         doc_query = doc_query.filter(Document.year_approved <= year_to)
+    # Category filter
+    if category:
+        doc_query = doc_query.filter(
+        func.lower(func.trim(Document.category)) == category.lower().strip()
+    )
 
     docs = doc_query.all()
     results = []
