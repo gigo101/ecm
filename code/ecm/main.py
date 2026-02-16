@@ -1,3 +1,19 @@
+# main.py (top-level)
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+from sentence_transformers import SentenceTransformer  # ✅ IMPORT FIRST
+
+
+from transformers import pipeline
+
+summarizer = pipeline(
+    "summarization",
+    model="facebook/bart-large-cnn",
+    device=-1  # CPU (use 0 if GPU)
+)
+
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from pydantic import BaseModel
@@ -9,7 +25,6 @@ import jwt
 import time
 from datetime import datetime
 from passlib.context import CryptContext
-import os
 from fastapi import UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from nlp_utils import extract_text_from_file, classify_document
@@ -25,7 +40,9 @@ from fastapi.responses import FileResponse
 from fastapi import HTTPException, Depends
 import mimetypes
 
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+from nlp_utils import generate_summary
+
+
 
 
 # pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -1116,6 +1133,15 @@ async def semantic_search(
 
         doc_embedding = np.array(doc.embedding).reshape(1, -1)
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
+        file_text = extract_text_from_file(doc.filepath)
+        file_text = extract_text_from_file(doc.filepath)
+        summary = generate_summary(
+            text=file_text[:8000],   # safety limit
+            query=query,
+            embedder=embedder,
+            top_k=3
+        )
+
 
         if score >= 0.35:
             results.append({
@@ -1127,7 +1153,8 @@ async def semantic_search(
                 "document_type": doc.document_type,
                 "uploaded_by": doc.uploaded_by,
                 "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-                "score": round(float(score), 3)
+                "score": round(float(score), 3),
+                "summary": summary   # 👈 ADD THIS
             })
 
     results.sort(key=lambda x: x["score"], reverse=True)

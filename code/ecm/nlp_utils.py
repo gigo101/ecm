@@ -6,6 +6,16 @@ import io
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import spacy
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+from transformers import pipeline
+
+summarizer = pipeline(
+    "summarization",
+    model="facebook/bart-large-cnn",
+    device=-1  # CPU; use 0 if GPU
+)
 
 def extract_text_from_file(filepath: str):
     # PDF
@@ -229,3 +239,55 @@ def get_relevant_sentences(text: str, query: str, embedder, top_k=5):
         for s, score in ranked[:top_k]
         if score > 0.35
     ]
+
+
+def generate_summary(text: str, query: str, embedder, top_k: int = 3):
+    """
+    Query-focused extractive summary
+    """
+    if not text.strip():
+        return ""
+
+    sentences = [s.strip() for s in text.split(".") if len(s.strip()) > 40]
+
+    if not sentences:
+        return ""
+
+    query_embedding = embedder.encode(query).reshape(1, -1)
+    sentence_embeddings = embedder.encode(sentences)
+
+    scores = cosine_similarity(query_embedding, sentence_embeddings)[0]
+
+    ranked = sorted(
+        zip(sentences, scores),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    summary_sentences = [s for s, _ in ranked[:top_k]]
+
+    return ". ".join(summary_sentences) + "."
+
+
+def generate_abstractive_summary(text: str, max_chars: int = 3000):
+    """
+    Generate an abstractive summary of a document.
+    """
+
+    if not text or len(text.strip()) < 200:
+        return ""
+
+    # Truncate safely (BART max tokens ~1024)
+    text = text[:max_chars]
+
+    try:
+        result = summarizer(
+            text,
+            max_length=150,
+            min_length=60,
+            do_sample=False
+        )
+        return result[0]["summary_text"]
+    except Exception as e:
+        print("Summary error:", e)
+        return ""
