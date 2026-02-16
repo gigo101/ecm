@@ -4,13 +4,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from sentence_transformers import SentenceTransformer  # ✅ IMPORT FIRST
 
 
-from transformers import pipeline
 
-summarizer = pipeline(
-    "summarization",
-    model="facebook/bart-large-cnn",
-    device=-1  # CPU (use 0 if GPU)
-)   
+
 
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -35,8 +30,6 @@ from nlp_utils import get_relevant_sentences
 from sqlalchemy import func
 from fastapi import HTTPException, Depends
 import mimetypes
-
-from nlp_utils import generate_summary
 from nlp_utils import generate_abstractive_summary
 
 
@@ -390,28 +383,24 @@ async def upload_document(
         f.write(await file.read())
 
     # NLP auto classification
+    # Extract text ONCE
+    file_text = extract_text_from_file(file_location)
+
+    # Auto classify
     if category == "Auto":
-        file_text = extract_text_from_file(file_location)
         combined_text = f"{description}\n{file_text}"
         category = classify_document(combined_text)
-    else:
-        # Still extract text for embeddings even if category is manual
-        file_text = extract_text_from_file(file_location)
 
-    # =====================================================
-    # ⭐ STEP 4 — GENERATE SEMANTIC EMBEDDING (PUT HERE)
-    # =====================================================
+    # Generate embedding
     embedding = embedder.encode(
         file_text[:5000] if file_text else f"{description} {file.filename}"
     ).tolist()
 
-    file_text = extract_text_from_file(file_location)
-
+    # Generate summary
     if file_text.strip():
-        summary = generate_abstractive_summary(file_text)
+        summary = generate_abstractive_summary(file_text[:4000])
     else:
         summary = None
-
 
     # ✅ 6. Save document record with updated filename
     document = Document(
