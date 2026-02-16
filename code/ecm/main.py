@@ -1129,6 +1129,25 @@ async def semantic_search(
         doc_embedding = np.array(doc.embedding).reshape(1, -1)
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
 
+        # OPTIONAL: ignore extremely low scores
+        if score < 0.15:
+            continue
+
+        # 🔎 Extract document text
+        text = extract_text_from_file(doc.filepath)
+
+        # 🔥 Generate highlights
+        highlights = get_relevant_sentences(
+            text=text,
+            query=query,
+            embedder=embedder,
+            top_k=5
+        )
+
+        # 🚫 If no highlights → skip document
+        if not highlights:
+            continue
+
         results.append({
             "id": doc.id,
             "filename": doc.filename,
@@ -1139,7 +1158,8 @@ async def semantic_search(
             "uploaded_by": doc.uploaded_by,
             "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
             "score": round(float(score), 3),
-            "summary": doc.summary   # ✅ FROM DATABASE
+            "summary": doc.summary,
+            "highlights": highlights   # 👈 optional: return directly
         })
 
     results.sort(key=lambda x: x["score"], reverse=True)
