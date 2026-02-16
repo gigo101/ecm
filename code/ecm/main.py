@@ -398,7 +398,7 @@ async def upload_document(
 
     # Generate summary
     if file_text.strip():
-        summary = generate_abstractive_summary(file_text[:4000])
+        summary = generate_abstractive_summary(file_text)
     else:
         summary = None
 

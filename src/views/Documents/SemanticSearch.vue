@@ -180,12 +180,21 @@ function downloadFile(filename) {
           :key="doc.id"
           class="border-b hover:bg-gray-100"
         >
-          <td class="p-3">{{ doc.filename }}</td>
+        <td class="p-3">
+          <div class="font-medium">{{ doc.filename }}</div>
+          <p
+            v-if="doc.summary"
+            class="text-sm text-gray-600 mt-1 line-clamp-3"
+          >
+            {{ doc.summary }}
+          </p>
+        </td>
           <td class="p-3">{{ doc.category }}</td>
           <td class="p-3">{{ doc.uploaded_by }}</td>
           <td class="p-3 font-mono text-sm">
             {{ doc.score }}
           </td>
+
           <td class="p-3 text-center">
             <button
               @click="openPreview(doc.id)"
