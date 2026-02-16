@@ -10,7 +10,7 @@ summarizer = pipeline(
     "summarization",
     model="facebook/bart-large-cnn",
     device=-1  # CPU (use 0 if GPU)
-)
+)   
 
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -31,12 +31,8 @@ from nlp_utils import extract_text_from_file, classify_document
 from fastapi.responses import FileResponse
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
 from nlp_utils import get_relevant_sentences
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 from sqlalchemy import func
-from fastapi.responses import FileResponse
 from fastapi import HTTPException, Depends
 import mimetypes
 
@@ -127,7 +123,7 @@ class Document(Base):
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     embedding = Column(JSON)  # ⭐ ADD THIS
-
+    summary = Column(Text, nullable=True)  # Add summary field
 
 # --- TOKEN SCHEMA ---
 class Token(BaseModel):
@@ -409,6 +405,14 @@ async def upload_document(
         file_text[:5000] if file_text else f"{description} {file.filename}"
     ).tolist()
 
+    file_text = extract_text_from_file(file_location)
+
+    if file_text.strip():
+        summary = generate_abstractive_summary(file_text)
+    else:
+        summary = None
+
+
     # ✅ 6. Save document record with updated filename
     document = Document(
         filename=new_filename,
@@ -418,9 +422,10 @@ async def upload_document(
         year_approved=year_approved,
         document_type=document_type,
         uploaded_by=current_user.email,
-        embedding=embedding  # ⭐ SAVE EMBEDDING
+        embedding=embedding,  # ⭐ SAVE EMBEDDING
+        summary=summary  # ⭐ SAVE SUMMARY
     )
-
+    
     db.add(document)
     db.commit()
     db.refresh(document)
@@ -1130,36 +1135,26 @@ async def semantic_search(
 
     for doc in docs:
         if not doc.embedding:
-            continue  # ⛑ safety
+            continue
 
         doc_embedding = np.array(doc.embedding).reshape(1, -1)
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
-        file_text = extract_text_from_file(doc.filepath)
-        file_text = extract_text_from_file(doc.filepath)
 
-
-        summary = generate_abstractive_summary(
-            text=file_text
-        )
-
-
-
-        if score >= 0.35:
-            results.append({
-                "id": doc.id,
-                "filename": doc.filename,
-                "description": doc.description,
-                "category": doc.category,
-                "year_approved": doc.year_approved,
-                "document_type": doc.document_type,
-                "uploaded_by": doc.uploaded_by,
-                "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-                "score": round(float(score), 3),
-                "summary": summary   # 👈 ADD THIS
-            })
+        results.append({
+            "id": doc.id,
+            "filename": doc.filename,
+            "description": doc.description,
+            "category": doc.category,
+            "year_approved": doc.year_approved,
+            "document_type": doc.document_type,
+            "uploaded_by": doc.uploaded_by,
+            "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+            "score": round(float(score), 3),
+            "summary": doc.summary   # ✅ FROM DATABASE
+        })
 
     results.sort(key=lambda x: x["score"], reverse=True)
-    return results
+    return results[:20]
 
 
 from nlp_utils import get_relevant_sentences
