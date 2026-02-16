@@ -41,6 +41,7 @@ from fastapi import HTTPException, Depends
 import mimetypes
 
 from nlp_utils import generate_summary
+from nlp_utils import generate_abstractive_summary
 
 
 
@@ -1135,12 +1136,12 @@ async def semantic_search(
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
         file_text = extract_text_from_file(doc.filepath)
         file_text = extract_text_from_file(doc.filepath)
-        summary = generate_summary(
-            text=file_text[:8000],   # safety limit
-            query=query,
-            embedder=embedder,
-            top_k=3
+
+
+        summary = generate_abstractive_summary(
+            text=file_text
         )
+
 
 
         if score >= 0.35:
