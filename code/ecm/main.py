@@ -440,22 +440,35 @@ async def upload_document(
 
 
 #Document list endpoint
+from fastapi import Query
+
 @app.get("/documents/list")
 async def list_documents(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, le=100),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
     query = db.query(Document)
 
+    # RBAC
     if current_user.role == "Viewer":
         query = query.filter(Document.document_type == "Public")
 
     elif current_user.role in ["Faculty", "Staff"]:
         query = query.filter(Document.document_type != "Confidential")
 
-    docs = query.order_by(Document.uploaded_at.desc()).all()
+    total = query.count()
 
-    # ✅ GET ALL USER FAVORITES ONCE
+    docs = (
+        query
+        .order_by(Document.uploaded_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    # ⭐ FAVORITES (optimized)
     user_favorites = db.query(Favorite.document_id).filter(
         Favorite.user_email == current_user.email
     ).all()
@@ -479,7 +492,13 @@ async def list_documents(
             "is_favorite": d.id in favorite_ids
         })
 
-    return result
+    return {
+        "data": result,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
 
 
 
@@ -1003,38 +1022,72 @@ def delete_office(
     db.commit()
     return {"message": "Office deleted"}
 
+from math import ceil
+from fastapi import Query
+
 @app.get("/documents/my-uploads")
 async def my_uploads(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, le=100),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # Only Admin & Uploader can access
+    # ✅ RBAC
     if current_user.role not in ["Admin", "Uploader"]:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    # ✅ BASE QUERY
+    base_query = db.query(Document).filter(
+        Document.uploaded_by == current_user.email
+    )
+
+    total = base_query.count()
+
+    # ✅ PAGINATION
     docs = (
-        db.query(Document)
-        .filter(Document.uploaded_by == current_user.email)
+        base_query
         .order_by(Document.uploaded_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
         .all()
     )
+
+    # ✅ GET USER FAVORITES (for star toggle if needed)
+    user_favorites = db.query(Favorite.document_id).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    favorite_ids = {f.document_id for f in user_favorites}
+
+    # ✅ GET UPLOADER INFO IN ONE QUERY
+    uploader = db.query(User).filter(
+        User.email == current_user.email
+    ).first()
+
+    uploader_name = uploader.office if uploader else current_user.email
 
     result = []
 
     for d in docs:
-        uploader = db.query(User).filter(User.email == d.uploaded_by).first()
-
         result.append({
             "id": d.id,
             "filename": d.filename,
             "description": d.description,
             "category": d.category,
+            "year_approved": d.year_approved,
             "document_type": d.document_type,
-            "uploaded_by": uploader.office if uploader else d.uploaded_by,
+            "uploaded_by": uploader_name,
             "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+            "is_favorite": d.id in favorite_ids
         })
 
-    return result
+    return {
+        "data": result,
+        "total": total,
+        "page": page,
+        "pages": ceil(total / limit)
+    }
+
 
 # @app.get("/documents/semantic-search")
 # async def semantic_search(

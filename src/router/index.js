@@ -129,6 +129,10 @@ const routes = [
   path: "/documents/favorites",
   component: () => import("@/views/Documents/MyFavorites.vue")
 },
+{
+  path: "/documents/my-uploads",
+  component: () => import("@/views/Documents/MyUploads.vue")
+},
 
 { 
     path: '/:catchAll(.*)', 

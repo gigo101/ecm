@@ -29,6 +29,15 @@ const role = ref(localStorage.getItem("role"));
         Documents
       </router-link>
       <router-link
+        v-if="role === 'Admin' || role === 'Uploader'"
+        to="/documents/my-uploads"
+        class="flex items-center gap-3 px-4 py-2 rounded hover:bg-green-700 hover:text-white transition"
+      >
+        <span>📂</span>
+        <span>My Uploads</span>
+      </router-link>
+
+      <router-link
         to="/semantic-search"
         class="flex items-center gap-2 px-4 py-2 hover:bg-dns_green"
         >

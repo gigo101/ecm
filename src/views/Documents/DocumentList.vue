@@ -12,35 +12,40 @@ const showPreview = ref(false);
 const previewId = ref(null);
 const toast = useToast();
 
-const role = ref(localStorage.getItem("role")); // ROLE STORED HERE
-const activeTab = ref("all"); // all | mine
+const role = ref(localStorage.getItem("role"));
 
-// Fetch all documents
+const page = ref(1);
+const limit = ref(10);
+const totalPages = ref(1);
+
 async function fetchDocuments() {
   loading.value = true;
   error.value = "";
 
   try {
-    const url =
-      activeTab.value === "mine"
-        ? "/documents/my-uploads"
-        : "/documents/list";
+    const res = await api.get("/documents/list", {
+      params: {
+        page: page.value,
+        limit: limit.value
+      }
+    });
 
-    const res = await api.get(url);
-    documents.value = res.data;
-  } catch (err) {
+    documents.value = res.data.data;
+    totalPages.value = res.data.pages;
+
+  } catch {
     error.value = "Unable to load documents.";
   } finally {
     loading.value = false;
   }
 }
 
-function switchTab(tab) {
-  activeTab.value = tab;
+function changePage(newPage) {
+  if (newPage < 1 || newPage > totalPages.value) return;
+  page.value = newPage;
   fetchDocuments();
 }
 
-// Search filter
 function filteredDocuments() {
   if (!search.value) return documents.value;
 
@@ -50,26 +55,24 @@ function filteredDocuments() {
   );
 }
 
-
-
-// Download
 function downloadFile(filename) {
   window.open(`http://127.0.0.1:8000/uploads/${filename}`, "_blank");
 }
 
-// Delete
 async function deleteDocument(id) {
   if (!confirm("Are you sure you want to delete this document?")) return;
 
   try {
     await api.delete(`/documents/${id}`);
 
-    // Reload
+    if (documents.value.length === 1 && page.value > 1) {
+      page.value--;
+    }
+
     fetchDocuments();
     toast.success("Document deleted successfully.");
-  } catch (err) {
-    console.error("Delete error:", err);
-    alert("Failed to delete document.");
+  } catch {
+    toast.error("Failed to delete document.");
   }
 }
 
@@ -82,56 +85,31 @@ async function toggleFavorite(doc) {
   }
 }
 
-
-
-
 function openPreview(id) {
   previewId.value = id;
   showPreview.value = true;
 }
 
-// Load on page load
-onMounted(() => {
-  fetchDocuments();
-});
+onMounted(fetchDocuments);
 </script>
 
 <template>
   <div class="p-8">
+
+    <!-- HEADER -->
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-xl font-semibold text-dns_dark">Documents</h1>
-      <router-link v-if="role==='Admin' || role==='Uploader'"
+
+      <router-link
+        v-if="role==='Admin' || role==='Uploader'"
         to="/documents/upload"
         class="px-4 py-2 bg-dns_dark text-white rounded"
       >
         Upload
       </router-link>
     </div>
-<div  v-if="role === 'Admin' || role === 'Uploader'" class="flex gap-4 mb-4">
-  <button
-    @click="switchTab('all')"
-    :class="activeTab === 'all'
-      ? 'bg-green-700 text-white'
-      : 'bg-gray-200 text-gray-700'"
-    class="px-4 py-2 rounded"
-  >
-    All Documents
-  </button>
 
-  <!-- Admin & Uploader only -->
-<button
-  @click="switchTab('mine')"
-  :class="activeTab === 'mine'
-    ? 'bg-green-700 text-white'
-    : 'bg-gray-200'"
-  class="px-4 py-2 rounded"
->
-  My Uploads
-</button>
-
-</div>
-
-    <!-- Search bar -->
+    <!-- SEARCH -->
     <input
       v-model="search"
       type="text"
@@ -139,97 +117,131 @@ onMounted(() => {
       class="w-full p-3 mb-4 border rounded-lg focus:ring-2 focus:ring-green-500"
     />
 
-    <div v-if="loading" class="text-gray-600">Loading...</div>
+    <div v-if="loading">Loading...</div>
     <div v-if="error" class="text-red-600">{{ error }}</div>
 
-    <table v-if="!loading" class="w-full bg-white shadow-lg rounded-lg overflow-hidden">
+    <!-- TABLE -->
+    <table v-if="!loading && filteredDocuments().length"
+           class="w-full bg-white shadow-lg rounded-lg overflow-hidden">
+
       <thead class="bg-green-700 text-white">
         <tr>
           <th class="p-3 text-left">Filename</th>
-          <!-- <th class="p-3 text-left">Description</th> -->
           <th class="p-3 text-left">Category</th>
           <th class="p-3 text-left">Type</th>
-          <th class="p-3 text-left">Year Approved</th>
+          <th class="p-3 text-left">Year</th>
           <th class="p-3 text-left">Uploaded By</th>
           <th class="p-3 text-left">Date</th>
-          <th class="p-3 text-center" colspan="3">Action</th>
+          <th class="p-3 text-center">Actions</th>
+          <th class="p-3"></th>
         </tr>
       </thead>
 
       <tbody>
-        <tr
-          v-for="doc in filteredDocuments()"
-          :key="doc.id"
-          class="border-b hover:bg-gray-100"
-        >
+        <tr v-for="doc in filteredDocuments()" :key="doc.id"
+            class="border-b hover:bg-gray-100">
+
           <td class="p-3">{{ doc.filename }}</td>
-          <!-- <td class="p-3">{{ doc.description }}</td> -->
           <td class="p-3">{{ doc.category }}</td>
+
           <td class="p-3 font-semibold">
-          <span v-if="doc.document_type === 'Confidential'" class="text-red-600">
-            {{ doc.document_type }}
-          </span>
-          <span v-else class="text-green-700">
-            {{ doc.document_type }}
-          </span>
+            <span v-if="doc.document_type === 'Confidential'" class="text-red-600">
+              {{ doc.document_type }}
+            </span>
+            <span v-else class="text-green-700">
+              {{ doc.document_type }}
+            </span>
           </td>
+
           <td class="p-3">{{ doc.year_approved }}</td>
           <td class="p-3">{{ doc.uploaded_by }}</td>
           <td class="p-3">{{ doc.uploaded_at }}</td>
-          <td class="p-3 text-center">
+
+          <!-- ACTIONS -->
+          <td class="p-3">
             <div class="flex justify-center gap-2">
-              <!-- View -->
+
+              <!-- PREVIEW -->
               <button
-                v-if="role==='Viewer' || role==='Faculty' || role==='Staff' || role==='Management'"
                 @click="openPreview(doc.id)"
-                class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
               >
-                View
+                Preview
               </button>
 
-              <!-- Download -->
+              <!-- DOWNLOAD -->
               <button
-                v-if="role==='Admin' || role==='Uploader' || role==='Faculty' || role==='Staff' || role==='Management'"
+                v-if="role !== 'Viewer'"
                 @click="downloadFile(doc.filename)"
-                class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
               >
                 Download
               </button>
+
+              <!-- DELETE -->
+              <button
+                v-if="role === 'Admin' || role === 'Uploader'"
+                @click="deleteDocument(doc.id)"
+                class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+              >
+                Delete
+              </button>
+
             </div>
           </td>
-          <td class="p-3 text-center">
-            <!-- FIXED ROLE CHECK -->
-            <button
-              v-if="role === 'Admin' || (role === 'Uploader' && activeTab=== 'mine')")
-              @click="deleteDocument(doc.id)"
-              class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Delete
-            </button>
-          </td>
+
+          <!-- FAVORITE -->
           <td class="p-3 text-center">
             <button
               @click="toggleFavorite(doc)"
               class="px-3 py-2 rounded"
-              :class="doc.is_favorite ? 'bg-yellow-500 text-white' : 'bg-gray-300'"
+              :class="doc.is_favorite
+                ? 'bg-yellow-500 text-white'
+                : 'bg-gray-300'"
             >
               ★
             </button>
           </td>
+
         </tr>
       </tbody>
     </table>
 
+    <!-- EMPTY STATE -->
     <div v-if="!loading && filteredDocuments().length === 0"
-         class="text-gray-600 text-center mt-4">
+         class="text-center text-gray-500 mt-6">
       No documents found.
     </div>
+
+    <!-- PAGINATION -->
+    <div class="flex justify-center items-center gap-4 mt-6">
+      <button
+        @click="changePage(page - 1)"
+        :disabled="page === 1"
+        class="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+      >
+        Prev
+      </button>
+
+      <span class="font-semibold">
+        Page {{ page }} of {{ totalPages }}
+      </span>
+
+      <button
+        @click="changePage(page + 1)"
+        :disabled="page === totalPages"
+        class="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+      >
+        Next
+      </button>
+    </div>
+
   </div>
 
-  <DocumentPreviewModal 
-  :show="showPreview"
-  :docId="previewId"
-  @close="showPreview = false"
-/>
-
+  <!-- PREVIEW MODAL -->
+  <DocumentPreviewModal
+    :show="showPreview"
+    :docId="previewId"
+    @close="showPreview = false"
+  />
 </template>
