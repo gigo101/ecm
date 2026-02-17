@@ -175,6 +175,16 @@ class DownloadRequest(Base):
     requested_at = Column(DateTime, default=datetime.utcnow)
     downloaded_at = Column(DateTime, nullable=True)  # ✅ ADD THIS
 
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_email = Column(String(255), index=True)
+    document_id = Column(Integer, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
 def get_db():
@@ -1382,3 +1392,33 @@ async def my_download_requests(
         }
         for r in requests
     ]
+
+
+@app.post("/documents/{doc_id}/favorite")
+async def toggle_favorite(
+    doc_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    fav = db.query(Favorite).filter(
+        Favorite.user_email == current_user.email,
+        Favorite.document_id == doc_id
+    ).first()
+
+    if fav:
+        db.delete(fav)
+        db.commit()
+        return {"status": "removed"}
+
+    new_fav = Favorite(
+        user_email=current_user.email,
+        document_id=doc_id
+    )
+    db.add(new_fav)
+    db.commit()
+
+    return {"status": "added"}
