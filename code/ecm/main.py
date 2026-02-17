@@ -1136,9 +1136,17 @@ async def semantic_search(
         func.lower(func.trim(Document.category)) == category.lower().strip()
     )
 
+    # ✅ GET USER FAVORITES ONCE
+    user_favorites = db.query(Favorite.document_id).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    favorite_ids = {f.document_id for f in user_favorites}
+    
+
     docs = doc_query.all()
     results = []
-
+    
     for doc in docs:
         if not doc.embedding:
             continue
@@ -1156,7 +1164,8 @@ async def semantic_search(
             "uploaded_by": doc.uploaded_by,
             "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
             "score": round(float(score), 3),
-            "summary": doc.summary   # ✅ FROM DATABASE
+            "summary": doc.summary,   # ✅ FROM DATABASE
+            "is_favorite": doc.id in favorite_ids  # ✅ FAVORITE FLAG
         })
 
     results.sort(key=lambda x: x["score"], reverse=True)
