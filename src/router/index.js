@@ -125,6 +125,11 @@ const routes = [
   meta: { requiresAuth: true }
 }
 ,
+{
+  path: "/documents/favorites",
+  component: () => import("@/views/Documents/MyFavorites.vue")
+},
+
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',

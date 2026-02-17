@@ -453,9 +453,14 @@ async def list_documents(
     elif current_user.role in ["Faculty", "Staff"]:
         query = query.filter(Document.document_type != "Confidential")
 
-    # Admin, Uploader, Management → see all
-
     docs = query.order_by(Document.uploaded_at.desc()).all()
+
+    # ✅ GET ALL USER FAVORITES ONCE
+    user_favorites = db.query(Favorite.document_id).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    favorite_ids = {f.document_id for f in user_favorites}
 
     result = []
 
@@ -469,11 +474,13 @@ async def list_documents(
             "category": d.category,
             "year_approved": d.year_approved,
             "document_type": d.document_type,
-            "uploaded_by": uploader.office if uploader else d.uploaded_by,  # ⭐ CHANGE
+            "uploaded_by": uploader.office if uploader else d.uploaded_by,
             "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+            "is_favorite": d.id in favorite_ids
         })
 
     return result
+
 
 
 
@@ -1422,3 +1429,74 @@ async def toggle_favorite(
     db.commit()
 
     return {"status": "added"}
+
+
+@app.get("/documents/favorites")
+async def get_my_favorites(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    favs = db.query(Favorite).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    doc_ids = [f.document_id for f in favs]
+
+    docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
+
+    return [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "category": d.category,
+            "document_type": d.document_type,
+            "uploaded_by": d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for d in docs
+    ]
+
+
+@app.get("/documents/my-favorites")
+async def my_favorites(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    favorites = db.query(Favorite).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    if not favorites:
+        return []
+
+    doc_ids = [f.document_id for f in favorites]
+
+    query = db.query(Document).filter(Document.id.in_(doc_ids))
+
+    # RBAC
+    if current_user.role == "Viewer":
+        query = query.filter(Document.document_type == "Public")
+
+    elif current_user.role in ["Faculty", "Staff"]:
+        query = query.filter(Document.document_type != "Confidential")
+
+    docs = query.order_by(Document.uploaded_at.desc()).all()
+
+    result = []
+
+    for d in docs:
+        uploader = db.query(User).filter(User.email == d.uploaded_by).first()
+
+        result.append({
+            "id": d.id,
+            "filename": d.filename,
+            "description": d.description,
+            "category": d.category,
+            "year_approved": d.year_approved,
+            "document_type": d.document_type,
+            "uploaded_by": uploader.office if uploader else d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+            "is_favorite": True
+        })
+
+    return result

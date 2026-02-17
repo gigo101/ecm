@@ -73,6 +73,15 @@ async function deleteDocument(id) {
   }
 }
 
+async function toggleFavorite(doc) {
+  try {
+    const res = await api.post(`/documents/${doc.id}/favorite`);
+    doc.is_favorite = res.data.status === "added";
+  } catch {
+    toast.error("Failed to update favorite");
+  }
+}
+
 
 
 
@@ -143,7 +152,7 @@ onMounted(() => {
           <th class="p-3 text-left">Year Approved</th>
           <th class="p-3 text-left">Uploaded By</th>
           <th class="p-3 text-left">Date</th>
-          <th class="p-3 text-center" colspan="2">Action</th>
+          <th class="p-3 text-center" colspan="3">Action</th>
         </tr>
       </thead>
 
@@ -196,6 +205,15 @@ onMounted(() => {
               class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
             >
               Delete
+            </button>
+          </td>
+          <td class="p-3 text-center">
+            <button
+              @click="toggleFavorite(doc)"
+              class="px-3 py-2 rounded"
+              :class="doc.is_favorite ? 'bg-yellow-500 text-white' : 'bg-gray-300'"
+            >
+              ★
             </button>
           </td>
         </tr>

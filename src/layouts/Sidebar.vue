@@ -41,6 +41,12 @@ const role = ref(localStorage.getItem("role"));
           pi-arrow-circle-down"></i> Download Requests
       </router-link>
 
+      <router-link to="/documents/favorites" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">
+        <i class="pi pi-star"></i>
+        My Favorites
+      </router-link>
+
+
 
       <!-- ADMIN SECTION -->
       <div v-if="role === 'Admin'" class="mt-6">
