@@ -1160,15 +1160,16 @@ async def semantic_search(
     category: str | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
+    page: int = 1,
+    limit: int = 10,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
     if not query.strip():
-        return []
+        return {"data": [], "total": 0, "pages": 1}
 
     query_embedding = embedder.encode(query).reshape(1, -1)
 
-    # Base query
     doc_query = db.query(Document).filter(Document.embedding != None)
 
     # RBAC
@@ -1177,52 +1178,52 @@ async def semantic_search(
     elif current_user.role in ["Faculty", "Staff"]:
         doc_query = doc_query.filter(Document.document_type != "Confidential")
 
-    # Year filter
-    if year_from is not None:
+    # Filters
+    if year_from:
         doc_query = doc_query.filter(Document.year_approved >= year_from)
 
-    if year_to is not None:
+    if year_to:
         doc_query = doc_query.filter(Document.year_approved <= year_to)
-    # Category filter
+
     if category:
         doc_query = doc_query.filter(
-        func.lower(func.trim(Document.category)) == category.lower().strip()
-    )
-
-    # ✅ GET USER FAVORITES ONCE
-    user_favorites = db.query(Favorite.document_id).filter(
-        Favorite.user_email == current_user.email
-    ).all()
-
-    favorite_ids = {f.document_id for f in user_favorites}
-    
+            func.lower(func.trim(Document.category)) == category.lower().strip()
+        )
 
     docs = doc_query.all()
-    results = []
-    
-    for doc in docs:
-        if not doc.embedding:
-            continue
 
+    results = []
+
+    for doc in docs:
         doc_embedding = np.array(doc.embedding).reshape(1, -1)
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
 
         results.append({
             "id": doc.id,
             "filename": doc.filename,
-            "description": doc.description,
             "category": doc.category,
-            "year_approved": doc.year_approved,
-            "document_type": doc.document_type,
             "uploaded_by": doc.uploaded_by,
             "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
             "score": round(float(score), 3),
-            "summary": doc.summary,   # ✅ FROM DATABASE
-            "is_favorite": doc.id in favorite_ids  # ✅ FAVORITE FLAG
+            "summary": doc.summary
         })
 
+    # sort by relevance
     results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:20]
+
+    total = len(results)
+
+    start = (page - 1) * limit
+    end = start + limit
+
+    paginated = results[start:end]
+
+    return {
+        "data": paginated,
+        "total": total,
+        "pages": (total + limit - 1) // limit
+    }
+
 
 
 from nlp_utils import get_relevant_sentences

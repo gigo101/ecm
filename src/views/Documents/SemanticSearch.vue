@@ -16,6 +16,10 @@ const yearFrom = ref(null);
 const yearTo = ref(null);
 const role = ref(localStorage.getItem("role"));
 
+const page = ref(1)
+const limit = ref(10)
+const totalPages = ref(1)
+
 
 const category = ref("");
 
@@ -45,40 +49,39 @@ const years = Array.from(
 );
 
 
-async function runSemanticSearch() {
-
-  if (yearFrom.value && yearTo.value && yearFrom.value > yearTo.value) {
-    error.value = "From year cannot be later than To year.";
-    return;
-  }
+async function runSemanticSearch(newPage = 1) {
 
   if (!query.value.trim()) return;
 
-  loading.value = true;
-  error.value = "";
-  results.value = [];
+  page.value = newPage
+  loading.value = true
+  error.value = ""
+  results.value = []
 
   try {
-    const params = { query: query.value };
 
-    if (yearFrom.value) params.year_from = Number(yearFrom.value);
-    if (yearTo.value) params.year_to = Number(yearTo.value);
-
-    if (category.value && category.value !== "") {
-      params.category = category.value;
+    const params = {
+      query: query.value,
+      page: page.value,
+      limit: limit.value
     }
 
-    const res = await api.get("/documents/semantic-search", { params });
+    if (yearFrom.value) params.year_from = yearFrom.value
+    if (yearTo.value) params.year_to = yearTo.value
+    if (category.value) params.category = category.value
 
-    results.value = res.data;
+    const res = await api.get("/documents/semantic-search", { params })
+
+    results.value = res.data.data
+    totalPages.value = res.data.pages
 
   } catch (err) {
-    console.error(err);
-    error.value = "Semantic search failed.";
+    error.value = "Semantic search failed."
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
+
 
 async function toggleFavorite(doc) {
   try {
@@ -114,7 +117,7 @@ function downloadFile(filename) {
     <div class="flex gap-2 mb-6">
       <input
         v-model="query"
-        @keyup.enter="runSemanticSearch"
+        @keyup.enter="runSemanticSearch(1)"
         type="text"
         placeholder="Enter your question or topic..."
         class="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
@@ -162,7 +165,7 @@ function downloadFile(filename) {
       </select>
 
       <button
-        @click="runSemanticSearch"
+        @click="runSemanticSearch(1)"
         class="bg-green-700 text-white px-6 rounded-lg"
       >
         Search
@@ -226,6 +229,31 @@ function downloadFile(filename) {
         </tr>
       </tbody>
     </table>
+    <div v-if="results.length"
+     class="flex justify-center items-center gap-4 mt-6">
+
+      <button
+        @click="runSemanticSearch(page - 1)"
+        :disabled="page === 1"
+        class="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+      >
+        Prev
+      </button>
+
+      <span class="font-semibold">
+        Page {{ page }} of {{ totalPages }}
+      </span>
+
+      <button
+        @click="runSemanticSearch(page + 1)"
+        :disabled="page === totalPages"
+        class="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+      >
+        Next
+      </button>
+
+    </div>
+
 
     <div v-if="!loading && results.length === 0 && query"
          class="text-gray-600 mt-6 text-center">
