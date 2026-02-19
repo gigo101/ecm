@@ -13,6 +13,18 @@ const error = ref("");
 const showPreview = ref(false);
 const previewId = ref(null);
 
+const category = ref("")
+
+const categories = [
+  "General",
+  "Administrative",
+  "Academics",
+  "Research",
+  "Policies",
+  "Official Issuances",
+  "News & Events"
+]
+
 async function fetchFavorites() {
   loading.value = true;
   error.value = "";
