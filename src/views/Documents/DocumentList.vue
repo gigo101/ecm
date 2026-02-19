@@ -119,6 +119,10 @@ onMounted(fetchDocuments);
 
     <div v-if="loading">Loading...</div>
     <div v-if="error" class="text-red-600">{{ error }}</div>
+        <!-- RESULT COUNT -->
+    <p class="text-sm text-gray-600 mb-2">
+      Showing {{ filteredDocuments().length }} result(s)
+    </p>
 
     <!-- TABLE -->
     <table v-if="!loading && filteredDocuments().length"

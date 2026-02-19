@@ -1,69 +1,79 @@
 <script setup>
-import { ref, onMounted } from "vue";
-import api from "@/api";
-import DocumentPreviewModal from "@/views/Documents/DocumentPreviewModal.vue";
-import { useToast } from "vue-toastification";
+import { ref, onMounted, computed } from "vue"
+import api from "@/api"
+import DocumentPreviewModal from "@/views/Documents/DocumentPreviewModal.vue"
+import { useToast } from "vue-toastification"
 
-const toast = useToast();
+const documents = ref([])
+const loading = ref(true)
+const error = ref("")
+const toast = useToast()
 
-const documents = ref([]);
-const loading = ref(true);
-const error = ref("");
+const showPreview = ref(false)
+const previewId = ref(null)
 
-const showPreview = ref(false);
-const previewId = ref(null);
-
+const search = ref("")
 const category = ref("")
 
 const categories = [
-  "General",
   "Administrative",
   "Academics",
   "Research",
   "Policies",
   "Official Issuances",
-  "News & Events"
+  "News & Events",
+  "General"
 ]
 
+const filteredDocuments = computed(() => {
+  return documents.value.filter(doc => {
+    const matchCategory =
+      !category.value || doc.category === category.value
+
+    const matchSearch =
+      !search.value ||
+      doc.filename.toLowerCase().includes(search.value.toLowerCase())
+
+    return matchCategory && matchSearch
+  })
+})
+
 async function fetchFavorites() {
-  loading.value = true;
-  error.value = "";
+  loading.value = true
+  error.value = ""
 
   try {
-    const res = await api.get("/documents/my-favorites");
-    documents.value = res.data;
+    const res = await api.get("/documents/my-favorites")
+    documents.value = res.data
   } catch (err) {
-    console.error(err);
-    error.value = "Failed to load favorites.";
+    console.error(err)
+    error.value = "Failed to load favorites."
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 function openPreview(id) {
-  previewId.value = id;
-  showPreview.value = true;
+  previewId.value = id
+  showPreview.value = true
 }
 
 async function toggleFavorite(doc) {
   try {
-    const res = await api.post(`/documents/${doc.id}/favorite`);
+    const res = await api.post(`/documents/${doc.id}/favorite`)
 
-    // ⭐ If removed → instantly remove from UI
     if (res.data.status === "removed") {
-      documents.value = documents.value.filter(d => d.id !== doc.id);
-      toast.success("Removed from favorites");
+      documents.value = documents.value.filter(d => d.id !== doc.id)
+      toast.success("Removed from favorites")
     }
-
   } catch (err) {
-    console.error(err);
-    toast.error("Action failed");
+    console.error(err)
+    toast.error("Action failed")
   }
 }
 
-onMounted(fetchFavorites);
+onMounted(fetchFavorites)
 </script>
-
 
 <template>
   <div class="p-8">
@@ -72,7 +82,51 @@ onMounted(fetchFavorites);
     <div v-if="loading">Loading...</div>
     <div v-if="error" class="text-red-600">{{ error }}</div>
 
-    <table v-if="documents.length" class="w-full bg-white shadow rounded-lg">
+    <!-- 🔎 FILTER BAR -->
+    <div class="flex flex-col md:flex-row gap-3 mb-4">
+
+      <!-- SEARCH -->
+      <div class="relative w-full md:max-w-md">
+        <input
+          v-model="search"
+          type="text"
+          placeholder="Search favorites..."
+          class="w-full p-3 pl-10 border rounded-lg focus:ring-2 focus:ring-green-500"
+        />
+
+        <svg
+          class="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+        </svg>
+      </div>
+
+      <!-- CATEGORY -->
+      <select
+        v-model="category"
+        class="p-3 border rounded-lg w-full md:w-64 focus:ring-2 focus:ring-green-500"
+      >
+        <option value="">All Categories</option>
+        <option v-for="c in categories" :key="c" :value="c">
+          {{ c }}
+        </option>
+      </select>
+    </div>
+
+    <!-- RESULT COUNT -->
+    <p class="text-sm text-gray-600 mb-2">
+      Showing {{ filteredDocuments.length }} result(s)
+    </p>
+
+    <!-- TABLE -->
+    <table
+      v-if="filteredDocuments.length"
+      class="w-full bg-white shadow rounded-lg"
+    >
       <thead class="bg-green-700 text-white">
         <tr>
           <th class="p-3 text-left">Filename</th>
@@ -88,7 +142,7 @@ onMounted(fetchFavorites);
 
       <tbody>
         <tr
-          v-for="doc in documents"
+          v-for="doc in filteredDocuments"
           :key="doc.id"
           class="border-b hover:bg-gray-100"
         >
@@ -102,7 +156,7 @@ onMounted(fetchFavorites);
           <td class="p-3 text-center">
             <button
               @click="openPreview(doc.id)"
-              class="bg-blue-600 text-white px-4 py-2 rounded"
+              class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             >
               Preview
             </button>
@@ -121,11 +175,12 @@ onMounted(fetchFavorites);
       </tbody>
     </table>
 
+    <!-- EMPTY STATE -->
     <div
-      v-if="!loading && documents.length === 0"
-      class="text-gray-600 text-center mt-6"
+      v-if="!loading && filteredDocuments.length === 0"
+      class="text-gray-600 mt-6 text-center"
     >
-      No favorite documents yet.
+      No favorite documents found.
     </div>
   </div>
 
@@ -135,3 +190,4 @@ onMounted(fetchFavorites);
     @close="showPreview = false"
   />
 </template>
+

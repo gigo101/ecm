@@ -171,7 +171,7 @@ function downloadFile(filename) {
         Search
       </button>
     </div>
-
+    
     <div v-if="loading" class="text-gray-600">Searching...</div>
     <div v-if="error" class="text-red-600">{{ error }}</div>
 
