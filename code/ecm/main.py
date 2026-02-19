@@ -1737,3 +1737,27 @@ async def preview_downloadable(
     )
 
 
+@app.delete("/downloadables/{file_id}")
+async def delete_downloadable(
+    file_id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    file = db.query(Downloadable).filter(Downloadable.id == file_id).first()
+
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    # uploader can delete only own file
+    if current_user.role == "Uploader" and file.uploaded_by != current_user.email:
+        raise HTTPException(403, "Not allowed")
+
+    if os.path.exists(file.filepath):
+        os.remove(file.filepath)
+
+    db.delete(file)
+    db.commit()
+
+    return {"message": "File deleted successfully"}

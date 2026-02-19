@@ -16,6 +16,9 @@ const role = ref(localStorage.getItem("role"))
 
 const showPreview = ref(false)
 const previewId = ref(null)
+import { useToast } from "vue-toastification"
+
+const toast = useToast()
 
 function openPreview(id) {
   previewId.value = id
@@ -73,6 +76,26 @@ function downloadFile(id) {
   )
 }
 
+async function deleteFile(id) {
+  if (!confirm("Delete this file?")) return
+
+  try {
+    await api.delete(`/downloadables/${id}`)
+
+    toast.success("File deleted successfully 🗑️")
+
+    // if last item on page → go back one page
+    if (forms.value.length === 1 && page.value > 1) {
+      page.value--
+    }
+
+    fetchForms()
+
+  } catch (err) {
+    console.error(err)
+    toast.error("Failed to delete file")
+  }
+}
 
 
 onMounted(fetchForms)
@@ -138,6 +161,13 @@ onMounted(fetchForms)
           <th class="p-3 text-left">Date</th>
           <th class="p-3 text-center">Preview</th>
           <th class="p-3 text-center">Download</th>
+          <th
+            v-if="role === 'Admin' || role === 'Uploader'"
+            class="p-3 text-center"
+            >
+            Delete
+         </th>
+
         </tr>
       </thead>
 
@@ -170,6 +200,18 @@ onMounted(fetchForms)
               Download
             </button>
           </td>
+          <td
+            v-if="role === 'Admin' || role === 'Uploader'"
+            class="p-3 text-center"
+            >
+            <button
+                @click="deleteFile(form.id)"
+                class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            >
+                Delete
+            </button>
+          </td>
+
         </tr>
       </tbody>
     </table>
