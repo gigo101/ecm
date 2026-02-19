@@ -1565,6 +1565,33 @@ async def my_favorites(
     return result
 
 
+@app.get("/documents/downloadable")
+async def downloadable_documents(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    docs = (
+        db.query(Document)
+        .filter(Document.document_type == "Public")
+        .order_by(Document.uploaded_at.desc())
+        .all()
+    )
 
+    result = []
 
-#Test only
+    for d in docs:
+        uploader = db.query(User).filter(User.email == d.uploaded_by).first()
+
+        result.append({
+            "id": d.id,
+            "filename": d.filename,
+            "description": d.description,
+            "category": d.category,
+            "year_approved": d.year_approved,
+            "document_type": d.document_type,
+            "uploaded_by": uploader.office if uploader else d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+        })
+
+    return result
+
