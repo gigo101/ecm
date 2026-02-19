@@ -183,6 +183,15 @@ class Favorite(Base):
     user_email = Column(String(255), index=True)
     document_id = Column(Integer, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+ 
+class Downloadable(Base):
+    __tablename__ = "downloadables"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255))
+    filepath = Column(String(500))
+    uploaded_by = Column(String(255))
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
 
 
 Base.metadata.create_all(bind=engine)
@@ -1594,4 +1603,137 @@ async def downloadable_documents(
         })
 
     return result
+
+
+@app.post("/downloadables/upload")
+async def upload_downloadable(
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    file_location = os.path.join("uploads", file.filename)
+
+    with open(file_location, "wb+") as f:
+        f.write(await file.read())
+
+    new_file = Downloadable(
+        filename=file.filename,
+        filepath=file_location,
+        uploaded_by=current_user.email
+    )
+
+    db.add(new_file)
+    db.commit()
+
+    return {"message": "File uploaded successfully"}
+
+
+
+@app.get("/downloadables/list")
+async def list_downloadables(
+    page: int = 1,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    query = db.query(Downloadable)
+
+    total = query.count()
+
+    files = (
+        query.order_by(Downloadable.uploaded_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    result = []
+
+    for f in files:
+        uploader = db.query(User).filter(User.email == f.uploaded_by).first()
+
+        result.append({
+            "id": f.id,
+            "filename": f.filename,
+            "uploaded_by": uploader.office if uploader else f.uploaded_by,
+            "uploaded_at": f.uploaded_at.strftime("%Y-%m-%d %H:%M") if f.uploaded_at else None,
+        })
+
+    return {
+        "data": result,
+        "total": total,
+        "page": page,
+        "pages": ceil(total / limit)
+    }
+
+
+
+@app.get("/downloadables/download/{file_id}")
+async def download_downloadable(
+    file_id: int,
+    token: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+    except:
+        raise HTTPException(401, "Invalid token")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(401, "Invalid user")
+
+    file = db.query(Downloadable).filter(Downloadable.id == file_id).first()
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    return FileResponse(
+        path=file.filepath,
+        filename=file.filename,
+        media_type="application/octet-stream"
+    )
+
+from fastapi import Query
+
+@app.get("/downloadables/preview/{id}")
+async def preview_downloadable(
+    id: int,
+    token: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    email = payload.get("sub")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(401, "Invalid user")
+
+    file = db.query(Downloadable).filter(Downloadable.id == id).first()
+
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    if not os.path.exists(file.filepath):
+        raise HTTPException(404, "Missing file")
+
+    # ✅ USE FILENAME FOR MIME DETECTION
+    mime_type, _ = mimetypes.guess_type(file.filename)
+
+    return FileResponse(
+        path=file.filepath,
+        media_type=mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": f'inline; filename="{file.filename}"'
+        }
+    )
+
 

@@ -134,6 +134,17 @@ const routes = [
   component: () => import("@/views/Documents/MyUploads.vue")
 },
 
+{
+  path: "/documents/downloadable",
+  component: () => import("@/views/Documents/Downloadable.vue")
+}
+,
+{
+  path: "/downloadables/upload",
+  component: () => import("@/views/Documents/UploadDownloadable.vue")
+}
+,
+
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',
