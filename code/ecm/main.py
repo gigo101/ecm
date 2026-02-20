@@ -193,6 +193,17 @@ class Downloadable(Base):
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
+class DocumentShare(Base):
+    __tablename__ = "document_shares"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, index=True)
+    shared_by = Column(String(255))
+    shared_to = Column(String(255))  # user email
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class ShareRequest(BaseModel):
+    users: list[str]  # list of emails
 
 Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
@@ -771,6 +782,14 @@ async def preview_document(
     # 🔎 Get document
     document = db.query(Document).filter(Document.id == doc_id).first()
 
+    is_shared = db.query(DocumentShare).filter_by(
+        document_id=document.id,
+        shared_to=current_user.email
+    ).first()
+
+    if not allowed_by_role and not is_shared:
+        raise HTTPException(403)
+    
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -814,6 +833,14 @@ async def download_document(
     token: str = Query(None),
     db: Session = Depends(get_db)
 ):
+    is_shared = db.query(DocumentShare).filter_by(
+        document_id=document.id,
+        shared_to=current_user.email
+    ).first()
+
+    if not allowed_by_role and not is_shared:
+        raise HTTPException(403)
+    
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -1761,3 +1788,56 @@ async def delete_downloadable(
     db.commit()
 
     return {"message": "File deleted successfully"}
+
+
+@app.post("/documents/{doc_id}/share")
+def share_document(
+    doc_id: int,
+    data: ShareRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    print("🔥 SHARE ENDPOINT HIT")
+    print("DOC ID:", doc_id)
+    print("USERS:", data.users)
+
+    if not data.users:
+        raise HTTPException(400, "No users provided")
+
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    for email in data.users:
+
+        print("➡ inserting for:", email)
+
+        db.add(DocumentShare(
+            document_id=doc_id,
+            shared_by=current_user.email,
+            shared_to=email
+        ))
+
+    db.commit()
+
+    print("✅ SHARE SAVED")
+
+    return {"message": "Document shared successfully"}
+
+
+@app.get("/documents/shared-with-me")
+def shared_with_me(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    shares = db.query(DocumentShare).filter(
+        DocumentShare.shared_to == current_user.email
+    ).all()
+
+    doc_ids = [s.document_id for s in shares]
+
+    docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
+
+    return docs

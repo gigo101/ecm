@@ -145,6 +145,12 @@ const routes = [
 }
 ,
 
+{
+  path: "/documents/shared",
+  component: () => import("@/views/Documents/SharedDocuments.vue")
+},
+
+
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',

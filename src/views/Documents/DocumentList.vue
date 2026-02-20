@@ -18,6 +18,41 @@ const page = ref(1);
 const limit = ref(10);
 const totalPages = ref(1);
 
+const showShareModal = ref(false);
+const selectedDoc = ref(null);
+const users = ref([]);
+const selectedUsers = ref([]);
+
+async function loadUsers() {
+  try {
+    const res = await api.get("/users")
+    users.value = res.data
+  } catch {
+    toast.error("Failed to load users")
+  }
+}
+
+function openShareModal(doc) {
+  selectedDoc.value = doc
+  selectedUsers.value = []
+  showShareModal.value = true
+  loadUsers()
+}
+
+async function shareDocument() {
+  try {
+    await api.post(`/documents/${selectedDoc.value.id}/share`, {
+      users: selectedUsers.value
+    })
+
+    toast.success("Document shared successfully")
+    showShareModal.value = false
+
+  } catch {
+    toast.error("Failed to share document")
+  }
+}
+
 async function fetchDocuments() {
   loading.value = true;
   error.value = "";
@@ -191,6 +226,14 @@ onMounted(fetchDocuments);
                 Delete
               </button>
 
+              <button
+                  v-if="role==='Admin' || role==='Uploader'"
+                  @click="openShareModal(doc)"
+                  class="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
+                >
+                  Share
+             </button>
+
             </div>
           </td>
 
@@ -241,6 +284,52 @@ onMounted(fetchDocuments);
     </div>
 
   </div>
+
+   <div
+  v-if="showShareModal"
+  class="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+>
+  <div class="bg-white p-6 rounded-lg w-96 shadow-lg">
+
+    <h2 class="text-lg font-bold mb-3">
+      Share {{ selectedDoc?.filename }}
+    </h2>
+
+    <!-- USER MULTI SELECT -->
+    <select
+      v-model="selectedUsers"
+      multiple
+      class="w-full border p-2 mb-4 h-40"
+    >
+      <option
+        v-for="u in users"
+        :key="u.email"
+        :value="u.email"
+      >
+        {{ u.first_name }} {{ u.last_name }} — {{ u.email }}
+      </option>
+    </select>
+
+    <div class="flex justify-end gap-2">
+
+      <button
+        @click="showShareModal=false"
+        class="px-3 py-1 bg-gray-300 rounded"
+      >
+        Cancel
+      </button>
+
+      <button
+        @click="shareDocument"
+        class="px-3 py-1 bg-purple-600 text-white rounded"
+      >
+        Share
+      </button>
+
+    </div>
+
+  </div>
+</div>
 
   <!-- PREVIEW MODAL -->
   <DocumentPreviewModal
