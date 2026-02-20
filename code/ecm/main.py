@@ -193,6 +193,14 @@ class Downloadable(Base):
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
+class DocumentShare(Base):
+    __tablename__ = "document_shares"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, index=True)
+    shared_by = Column(String(255))
+    shared_to = Column(String(255))  # user email
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
