@@ -31,7 +31,7 @@ from sqlalchemy import func
 from fastapi import HTTPException, Depends
 import mimetypes
 from nlp_utils import generate_abstractive_summary
-
+from datetime import datetime, timedelta
 
 
 
@@ -1905,3 +1905,35 @@ def get_document_shares(
     ).all()
 
     return shares
+
+@app.get("/dashboard/stats")
+def dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # 📄 TOTAL DOCUMENTS
+    total_docs = db.query(func.count(Document.id)).scalar()
+
+    # 📅 START OF WEEK
+    start_of_week = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
+
+    # ⬆️ UPLOADS THIS WEEK
+    weekly_uploads = db.query(func.count(Document.id)).filter(
+        Document.uploaded_at >= start_of_week
+    ).scalar()
+
+    # 🕒 RECENT DOCUMENTS
+    recent_docs = db.query(Document).order_by(
+        Document.uploaded_at.desc()
+    ).limit(5).all()
+
+    return {
+        "total_documents": total_docs,
+        "weekly_uploads": weekly_uploads,
+        "recent": [
+            {
+                "id": d.id,
+                "title": d.filename
+            } for d in recent_docs
+        ]
+    }

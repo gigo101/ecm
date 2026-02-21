@@ -1,40 +1,58 @@
 <script setup>
-    import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import api from "@/api"
+import SharedWithMeWidget from "@/views/dashboard/SharedWithMeWidget.vue"
 
-    const totalDocs = ref(254)
-    const weeklyUploads = ref(12)
-    const recent = ref([
-    { id: 1, title: 'Student Handbook.pdf' },
-    { id: 2, title: 'Data Privacy Policy.docx' },
-    { id: 3, title: 'Research Ethics Guidelines.pdf' }
-    ])
+const totalDocs = ref(0)
+const weeklyUploads = ref(0)
+const recent = ref([])
+const loading = ref(true)
+
+async function loadDashboard() {
+  const res = await api.get("/dashboard/stats")
+
+  totalDocs.value = res.data.total_documents
+  weeklyUploads.value = res.data.weekly_uploads
+  recent.value = res.data.recent
+
+  loading.value = false
+}
+onMounted(loadDashboard)
 </script>
 
 <template>
-    <div>
-        <h1 class="text-2xl font-semibold text-dns_dark mb-6">Dashboard</h1>
-        <div class="grid grid-cols-2 gap-6">
-            <div class="p-6 bg-green-200 rounded shadow">
-                <div class="text-sm text-gray-500">Total Documents</div>
-                <div class="text-4xl font-bold text-dns_dark mt-2">{{ totalDocs }}</div>
-            </div>
-            <div class="p-6 bg-green-200 rounded shadow">
-                <div class="text-sm text-gray-500">Uploaded this week</div>
-                <div class="text-4xl font-bold text-dns_dark mt-2">{{ weeklyUploads }}</div>
-            </div>
-        </div>
+ <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        <section class="mt-8 grid grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded shadow">
-                <h2 class="font-semibold mb-4">Recent Uploads</h2>
-                <ul class="list-disc pl-6 text-gray-700">
-                <li v-for="doc in recent" :key="doc.id">{{ doc.title }}</li>
-                </ul>
-            </div>
-            <div class="bg-white p-6 rounded shadow flex items-center justify-center">
-                <router-link to="/upload" class="p-6 border-2 border-dashed rounded text-dns_dark">Upload Document</router-link>
-            </div>
-        </section>
+  <div class="p-6 bg-green-200 rounded shadow">
+    <div class="text-sm text-gray-500">Total Documents</div>
+    <div class="text-4xl font-bold text-dns_dark mt-2">
+      {{ totalDocs }}
     </div>
+  </div>
+
+  <div class="p-6 bg-green-200 rounded shadow">
+    <div class="text-sm text-gray-500">Uploaded this week</div>
+    <div class="text-4xl font-bold text-dns_dark mt-2">
+      {{ weeklyUploads }}
+    </div>
+  </div>
+
+  <SharedWithMeWidget />
+
+  <div class="bg-white p-6 rounded shadow">
+    <div class="text-sm text-gray-500 mb-2">Recent Documents</div>
+
+    <ul class="space-y-1 text-sm">
+      <li
+        v-for="doc in recent"
+        :key="doc.id"
+        class="hover:text-green-700 cursor-pointer"
+      >
+        • {{ doc.title }}
+      </li>
+    </ul>
+  </div>
+
+</div>
 </template>
 
