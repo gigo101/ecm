@@ -329,7 +329,47 @@ def get_current_user(
 
     return user
 
+from sqlalchemy import exists
+from sqlalchemy.orm import Session
 
+def can_access_document(document, current_user, db: Session):
+    """
+    Returns True if the user is allowed to access the document
+    either by role OR by explicit sharing.
+    """
+
+    # -----------------------------
+    # 1️⃣ ROLE-BASED ACCESS
+    # -----------------------------
+    allowed_by_role = False
+
+    if current_user.role in ["Admin", "Uploader"]:
+        allowed_by_role = True
+
+    elif current_user.role in ["Faculty", "Staff"]:
+        # Faculty & Staff cannot access Confidential unless shared
+        if document.document_type != "Confidential":
+            allowed_by_role = True
+
+    elif current_user.role == "Viewer":
+        # Viewer can access Public only unless shared
+        if document.document_type == "Public":
+            allowed_by_role = True
+
+    # -----------------------------
+    # 2️⃣ SHARED ACCESS
+    # -----------------------------
+    is_shared = db.query(
+        exists().where(
+            DocumentShare.document_id == document.id,
+            DocumentShare.shared_to == current_user.email
+        )
+    ).scalar()
+
+    # -----------------------------
+    # ✅ FINAL DECISION
+    # -----------------------------
+    return allowed_by_role or is_shared
 
 #Document upload end point
 UPLOAD_DIR = "uploads"
@@ -779,32 +819,18 @@ async def preview_document(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # 🔎 Get document
     document = db.query(Document).filter(Document.id == doc_id).first()
 
-    is_shared = db.query(DocumentShare).filter_by(
-        document_id=document.id,
-        shared_to=current_user.email
-    ).first()
-
-    if not allowed_by_role and not is_shared:
-        raise HTTPException(403)
-    
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # 🔐 RBAC — VIEWER → Public only
-    if current_user.role == "Viewer" and document.document_type != "Public":
+    # ✅ NEW UNIFIED ACCESS CHECK
+    if not can_access_document(document, current_user, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    # 🔐 RBAC — Faculty & Staff → no Confidential
-    if document.document_type == "Confidential" and current_user.role in ["Faculty", "Staff"]:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    # 🧠 Detect correct MIME type (PDF / image / others)
     mime_type, _ = mimetypes.guess_type(document.filepath)
 
-    # 📝 LOG VIEW
+    # ✅ LOG VIEW
     log = DocumentLog(
         document_id=document.id,
         user_email=current_user.email,
@@ -814,13 +840,10 @@ async def preview_document(
     db.add(log)
     db.commit()
 
-    # 📂 Return file for inline preview
     return FileResponse(
         path=document.filepath,
         media_type=mime_type or "application/octet-stream",
-        headers={
-            "Content-Disposition": "inline"
-        }
+        headers={"Content-Disposition": "inline"}
     )
 
 
