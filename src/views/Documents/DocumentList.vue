@@ -3,7 +3,23 @@ import { ref, onMounted } from "vue";
 import api from "@/api";
 import DocumentPreviewModal from "@/views/Documents/DocumentPreviewModal.vue";
 import { useToast } from "vue-toastification";
+import { computed } from "vue"
 
+const availableUsers = computed(() => {
+  return users.value
+    .filter(u =>
+      !existingShares.value.some(s => s.shared_to === u.email)
+    )
+    .filter(u => {
+      const term = userSearch.value.toLowerCase()
+
+      return (
+        u.first_name.toLowerCase().includes(term) ||
+        u.last_name.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term)
+      )
+    })
+})
 const documents = ref([]);
 const loading = ref(true);
 const error = ref("");
@@ -23,6 +39,7 @@ const selectedDoc = ref(null);
 const users = ref([]);
 const selectedUsers = ref([]);
 const existingShares = ref([]);
+const userSearch = ref("");
 
 async function loadUsers() {
   try {
@@ -43,6 +60,7 @@ async function loadUsers() {
 async function openShareModal(doc) {
   selectedDoc.value = doc
   selectedUsers.value = []
+  userSearch.value = ""   // ⭐ reset search
   showShareModal.value = true
 
   await loadUsers()
@@ -63,14 +81,38 @@ async function revokeAccess(email) {
 }
 
 
+// async function shareDocument() {
+//     await api.post(`/documents/${selectedDoc.value.id}/share`, {
+//       users: selectedUsers.value
+//     })
+
+//     const res = await api.get(`/documents/${selectedDoc.value.id}/shares`)
+//     existingShares.value = res.data
+//     selectedUsers.value = []
+// }
+
 async function shareDocument() {
+  try {
+
+    if (selectedUsers.value.length === 0) {
+      toast.warning("Select at least one user")
+      return
+    }
+
     await api.post(`/documents/${selectedDoc.value.id}/share`, {
       users: selectedUsers.value
     })
 
-    const res = await api.get(`/documents/${selectedDoc.value.id}/shares`)
-    existingShares.value = res.data
-    selectedUsers.value = []
+    toast.success("Document shared successfully")
+
+    // ⏳ allow toast to render first
+    setTimeout(() => {
+      showShareModal.value = false
+    }, 200)
+
+  } catch (err) {
+    toast.error("Failed to share document")
+  }
 }
 
 async function fetchDocuments() {
@@ -336,28 +378,33 @@ onMounted(fetchDocuments);
   </div>
 
 </div>
+    <input
+      v-model="userSearch"
+      type="text"
+      placeholder="Search user..."
+      class="w-full border p-2 mb-2 rounded"
+    />
     <select
       v-model="selectedUsers"
       multiple
       class="w-full border p-2 mb-4 h-40"
     >
-      <!-- <option
-        v-for="u in users"
-        :key="u.email"
-        :value="u.email"
-      >
-        {{ u.first_name }} {{ u.last_name }} — {{ u.email }}
-      </option> -->
-<option
-  v-for="u in users.filter(
-    user => !existingShares.some(s => s.shared_to === user.email)
-  )"
-  :key="u.email"
-  :value="u.email"
->
-  {{ u.first_name }} {{ u.last_name }} — {{ u.email }}
-</option>
-          </select>
+        <option
+          v-for="u in availableUsers"
+          :key="u.email"
+          :value="u.email"
+        >
+          {{ u.first_name }} {{ u.last_name }} — {{ u.email }}
+        </option>
+
+        <option v-if="availableUsers.length === 0" disabled>
+          No users found
+        </option>
+    </select>
+
+    <p class="text-xs text-gray-500 mb-3">
+      {{ selectedUsers.length }} user(s) selected
+    </p>
 
     <div class="flex justify-end gap-2">
 
