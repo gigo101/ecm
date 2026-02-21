@@ -1841,3 +1841,41 @@ def shared_with_me(
     docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
 
     return docs
+
+
+@app.delete("/documents/{doc_id}/share/{email}")
+def revoke_share(
+    doc_id: int,
+    email: str,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    share = db.query(DocumentShare).filter_by(
+        document_id=doc_id,
+        shared_to=email
+    ).first()
+
+    if not share:
+        raise HTTPException(404, "Share not found")
+
+    db.delete(share)
+    db.commit()
+
+    return {"message": "Access revoked"}
+
+
+@app.get("/documents/{doc_id}/shares")
+def get_document_shares(
+    doc_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    shares = db.query(DocumentShare).filter(
+        DocumentShare.document_id == doc_id
+    ).all()
+
+    return shares

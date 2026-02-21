@@ -22,6 +22,7 @@ const showShareModal = ref(false);
 const selectedDoc = ref(null);
 const users = ref([]);
 const selectedUsers = ref([]);
+const existingShares = ref([]);
 
 async function loadUsers() {
   try {
@@ -32,25 +33,44 @@ async function loadUsers() {
   }
 }
 
-function openShareModal(doc) {
+// function openShareModal(doc) {
+//   selectedDoc.value = doc
+//   selectedUsers.value = []
+//   showShareModal.value = true
+//   loadUsers()
+// }
+
+async function openShareModal(doc) {
   selectedDoc.value = doc
   selectedUsers.value = []
   showShareModal.value = true
-  loadUsers()
+
+  await loadUsers()
+
+  const res = await api.get(`/documents/${doc.id}/shares`)
+  existingShares.value = res.data
 }
 
+async function revokeAccess(email) {
+  await api.delete(
+    `/documents/${selectedDoc.value.id}/share/${email}`
+  )
+
+  existingShares.value =
+    existingShares.value.filter(s => s.shared_to !== email)
+
+  toast.success("Access revoked")
+}
+
+
 async function shareDocument() {
-  try {
     await api.post(`/documents/${selectedDoc.value.id}/share`, {
       users: selectedUsers.value
     })
 
-    toast.success("Document shared successfully")
-    showShareModal.value = false
-
-  } catch {
-    toast.error("Failed to share document")
-  }
+    const res = await api.get(`/documents/${selectedDoc.value.id}/shares`)
+    existingShares.value = res.data
+    selectedUsers.value = []
 }
 
 async function fetchDocuments() {
@@ -296,19 +316,48 @@ onMounted(fetchDocuments);
     </h2>
 
     <!-- USER MULTI SELECT -->
+     <div v-if="existingShares.length" class="mb-3">
+
+  <p class="font-semibold text-sm mb-1">Currently shared with:</p>
+
+  <div
+    v-for="s in existingShares"
+    :key="s.shared_to"
+    class="flex justify-between items-center bg-gray-100 px-2 py-1 rounded mb-1"
+  >
+    <span class="text-sm">{{ s.shared_to }}</span>
+
+    <button
+      @click="revokeAccess(s.shared_to)"
+      class="text-red-600 text-xs hover:underline"
+    >
+      Remove
+    </button>
+  </div>
+
+</div>
     <select
       v-model="selectedUsers"
       multiple
       class="w-full border p-2 mb-4 h-40"
     >
-      <option
+      <!-- <option
         v-for="u in users"
         :key="u.email"
         :value="u.email"
       >
         {{ u.first_name }} {{ u.last_name }} — {{ u.email }}
-      </option>
-    </select>
+      </option> -->
+<option
+  v-for="u in users.filter(
+    user => !existingShares.some(s => s.shared_to === user.email)
+  )"
+  :key="u.email"
+  :value="u.email"
+>
+  {{ u.first_name }} {{ u.last_name }} — {{ u.email }}
+</option>
+          </select>
 
     <div class="flex justify-end gap-2">
 

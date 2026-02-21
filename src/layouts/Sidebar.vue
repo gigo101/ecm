@@ -36,7 +36,8 @@ const role = ref(localStorage.getItem("role"));
         <span>📂</span>
         <span>My Uploads</span>
       </router-link>
-      <router-link to="/documents/shared">
+      <router-link to="/documents/shared" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">
+        <i class="pi pi-file-export text-dns_light text-lg"></i>
         Shared Documents
       </router-link>
       <router-link
