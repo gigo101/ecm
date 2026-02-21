@@ -540,6 +540,10 @@ async def list_documents(
     for d in docs:
         uploader = db.query(User).filter(User.email == d.uploaded_by).first()
 
+        shared_count = db.query(DocumentShare).filter(
+            DocumentShare.document_id == d.id
+        ).count()
+
         result.append({
             "id": d.id,
             "filename": d.filename,
@@ -549,7 +553,8 @@ async def list_documents(
             "document_type": d.document_type,
             "uploaded_by": uploader.office if uploader else d.uploaded_by,
             "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-            "is_favorite": d.id in favorite_ids
+            "is_favorite": d.id in favorite_ids,
+            "shared_count": shared_count
         })
 
     return {
@@ -851,48 +856,34 @@ async def preview_document(
 from fastapi import Query
 
 @app.get("/documents/download/{doc_id}")
-async def download_document(
+def download_document(
     doc_id: int,
-    token: str = Query(None),
+    token: str,
     db: Session = Depends(get_db)
 ):
-    is_shared = db.query(DocumentShare).filter_by(
-        document_id=document.id,
-        shared_to=current_user.email
-    ).first()
+    user = get_current_user(token, db)
 
-    if not allowed_by_role and not is_shared:
-        raise HTTPException(403)
-    
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
-    except:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid user")
-
+    # ✅ LOAD DOCUMENT FIRST
     document = db.query(Document).filter(Document.id == doc_id).first()
+
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if not os.path.exists(document.filepath):
-        raise HTTPException(status_code=404, detail="File missing on server")
+    # ✅ ACCESS CHECK (ROLE OR SHARED)
+    if not can_access_document(document, user, db):
+        raise HTTPException(status_code=403, detail="Access denied")
 
-    # 🔐 RBAC
-    if user.role == "Viewer" and document.document_type != "Public":
-        raise HTTPException(status_code=403, detail="Not allowed")
+    # ✅ CHECK IF SHARED
+    is_shared = db.query(
+        exists().where(
+            DocumentShare.document_id == document.id,
+            DocumentShare.shared_to == user.email
+        )
+    ).scalar()
 
-    if document.document_type == "Confidential" and user.role in ["Faculty", "Staff"]:
-        raise HTTPException(status_code=403, detail="Not allowed")
+    # ✅ VIEWER DOWNLOAD APPROVAL (ONLY IF NOT SHARED)
+    if user.role == "Viewer" and not is_shared:
 
-    # ✅ VIEWER REQUEST CHECK
-    if user.role == "Viewer":
         req = db.query(DownloadRequest).filter(
             DownloadRequest.document_id == document.id,
             DownloadRequest.requester_email == user.email,
@@ -914,17 +905,17 @@ async def download_document(
         document_id=document.id,
         user_email=user.email,
         action="DOWNLOAD",
-        source="REQUEST"
+        source="PREVIEW"
     )
     db.add(log)
     db.commit()
 
+    # ✅ RETURN FILE
     return FileResponse(
         path=document.filepath,
         filename=document.filename,
         media_type="application/octet-stream"
     )
-
 
 
 @app.get("/documents/details/{doc_id}")
@@ -1125,9 +1116,15 @@ async def my_uploads(
 
     uploader_name = uploader.office if uploader else current_user.email
 
+   
+
     result = []
 
     for d in docs:
+        shared_count = db.query(DocumentShare).filter(
+            DocumentShare.document_id == d.id
+        ).count()
+
         result.append({
             "id": d.id,
             "filename": d.filename,
@@ -1137,7 +1134,8 @@ async def my_uploads(
             "document_type": d.document_type,
             "uploaded_by": uploader_name,
             "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-            "is_favorite": d.id in favorite_ids
+            "is_favorite": d.id in favorite_ids,
+            "shared_count": shared_count
         })
 
     return {
@@ -1257,6 +1255,10 @@ async def semantic_search(
         doc_embedding = np.array(doc.embedding).reshape(1, -1)
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
 
+        shared_count = db.query(DocumentShare).filter(
+            DocumentShare.document_id == doc.id
+        ).count()
+
         results.append({
             "id": doc.id,
             "filename": doc.filename,
@@ -1264,7 +1266,8 @@ async def semantic_search(
             "uploaded_by": doc.uploaded_by,
             "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
             "score": round(float(score), 3),
-            "summary": doc.summary
+            "summary": doc.summary,
+            "shared_count": shared_count
         })
 
     # sort by relevance

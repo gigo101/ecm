@@ -10,7 +10,7 @@ const error = ref("")
 const showPreview = ref(false)
 const previewId = ref(null)
 const toast = useToast()
-
+const role = ref(localStorage.getItem("role"))
 const page = ref(1)
 const limit = ref(10)
 const totalPages = ref(1)
@@ -111,7 +111,19 @@ onMounted(fetchMyUploads)
           :key="doc.id"
           class="border-b hover:bg-gray-100"
         >
-          <td class="p-3">{{ doc.filename }}</td>
+          <td class="p-3">
+              <div class="font-medium">
+                {{ doc.filename }}
+              </div>
+
+              <!-- 👥 SHARED COUNT -->
+              <div
+                v-if="doc.shared_count > 0 && (role === 'Admin' || role === 'Uploader')"
+                class="text-xs text-purple-600"
+              >
+                Shared with {{ doc.shared_count }} user(s)
+              </div>
+          </td>
           <td class="p-3">{{ doc.category }}</td>
 
           <td class="p-3 font-semibold">
