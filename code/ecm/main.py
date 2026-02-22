@@ -859,6 +859,7 @@ from fastapi import Query
 def download_document(
     doc_id: int,
     token: str,
+    source: str = "PREVIEW",
     db: Session = Depends(get_db)
 ):
     user = get_current_user(token, db)
@@ -905,7 +906,7 @@ def download_document(
         document_id=document.id,
         user_email=user.email,
         action="DOWNLOAD",
-        source="PREVIEW"
+        source=source.upper()
     )
     db.add(log)
     db.commit()
