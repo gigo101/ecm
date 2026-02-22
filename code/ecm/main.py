@@ -2039,3 +2039,46 @@ def document_type_distribution(
         }
         for r in results
     ]
+
+from sqlalchemy import func, desc
+
+@app.get("/dashboard/most-viewed")
+def most_viewed_documents(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    query = db.query(
+        Document.id,
+        Document.filename,
+        func.count(DocumentLog.id).label("views")
+    ).join(
+        DocumentLog, DocumentLog.document_id == Document.id
+    ).filter(
+        DocumentLog.action == "VIEW"
+    )
+
+    # 📤 UPLOADER → ONLY MY DOCUMENTS
+    if current_user.role == "Uploader":
+        query = query.filter(
+            Document.uploaded_by == current_user.email
+        )
+
+    # 👀 VIEWER / FACULTY / STAFF → NO ACCESS
+    elif current_user.role not in ["Admin"]:
+        return []
+
+    results = query.group_by(
+        Document.id
+    ).order_by(
+        desc("views")
+    ).limit(5).all()
+
+    return [
+        {
+            "id": r.id,
+            "title": r.filename,
+            "views": r.views
+        }
+        for r in results
+    ]
