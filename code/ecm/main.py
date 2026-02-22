@@ -1906,34 +1906,68 @@ def get_document_shares(
 
     return shares
 
+from sqlalchemy import func
+from datetime import datetime, timedelta
+
 @app.get("/dashboard/stats")
 def dashboard_stats(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # 📄 TOTAL DOCUMENTS
-    total_docs = db.query(func.count(Document.id)).scalar()
 
-    # 📅 START OF WEEK
     start_of_week = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
 
-    # ⬆️ UPLOADS THIS WEEK
-    weekly_uploads = db.query(func.count(Document.id)).filter(
-        Document.uploaded_at >= start_of_week
-    ).scalar()
+    # 👑 ADMIN → SYSTEM STATS
+    if current_user.role == "Admin":
 
-    # 🕒 RECENT DOCUMENTS
-    recent_docs = db.query(Document).order_by(
-        Document.uploaded_at.desc()
-    ).limit(5).all()
+        total_docs = db.query(func.count(Document.id)).scalar()
+
+        weekly_uploads = db.query(func.count(Document.id)).filter(
+            Document.uploaded_at >= start_of_week
+        ).scalar()
+
+        recent_docs = db.query(Document).order_by(
+            Document.uploaded_at.desc()
+        ).limit(5).all()
+
+    # 📤 UPLOADER → PERSONAL STATS
+    elif current_user.role == "Uploader":
+
+        total_docs = db.query(func.count(Document.id)).filter(
+            Document.uploaded_by == current_user.email
+        ).scalar()
+
+        weekly_uploads = db.query(func.count(Document.id)).filter(
+            Document.uploaded_by == current_user.email,
+            Document.uploaded_at >= start_of_week
+        ).scalar()
+
+        recent_docs = db.query(Document).filter(
+            Document.uploaded_by == current_user.email
+        ).order_by(Document.uploaded_at.desc()).limit(5).all()
+
+    # 👀 VIEWER / FACULTY / STAFF
+    else:
+
+        total_docs = db.query(func.count(DocumentShare.id)).filter(
+            DocumentShare.shared_to == current_user.email
+        ).scalar()
+
+        weekly_uploads = 0
+
+        recent_docs = db.query(Document).join(
+            DocumentShare,
+            DocumentShare.document_id == Document.id
+        ).filter(
+            DocumentShare.shared_to == current_user.email
+        ).order_by(Document.uploaded_at.desc()).limit(5).all()
 
     return {
+        "role": current_user.role,
         "total_documents": total_docs,
         "weekly_uploads": weekly_uploads,
         "recent": [
-            {
-                "id": d.id,
-                "title": d.filename
-            } for d in recent_docs
+            {"id": d.id, "title": d.filename}
+            for d in recent_docs
         ]
     }
