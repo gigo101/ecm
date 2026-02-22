@@ -940,7 +940,7 @@ async def document_details(
     log = DocumentLog(
         document_id=doc.id,
         user_email=current_user.email,
-        action="VIEW",
+        action="DETAILS_VIEW",
         source="LIST"
     )
     db.add(log)
