@@ -3,6 +3,8 @@ import { ref, onMounted } from "vue"
 import api from "@/api"
 import SharedWithMeWidget from "@/views/dashboard/SharedWithMeWidget.vue"
 import FavoritesWidget from "@/views/dashboard/FavoritesWidget.vue"
+import UploadActivityChart from "@/views/dashboard/UploadActivityChart.vue"
+import DocumentTypePieChart from "@/views/dashboard/DocumentTypePieChart.vue"
 
 const role = ref("")
 const totalDocs = ref(0)
@@ -93,8 +95,13 @@ onMounted(loadDashboard)
 
         <!-- 🔔 SHARED WITH ME WIDGET -->
         <SharedWithMeWidget />
-  <FavoritesWidget />
-
+        <FavoritesWidget />
+        <UploadActivityChart
+            v-if="role === 'Admin' || role === 'Uploader'"
+        />
+        <DocumentTypePieChart
+            v-if="role === 'Admin' || role === 'Uploader'"
+        />
         <!-- 🕒 RECENT DOCUMENTS -->
         <div class="bg-white p-6 rounded shadow">
 

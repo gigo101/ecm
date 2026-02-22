@@ -32,7 +32,7 @@ from fastapi import HTTPException, Depends
 import mimetypes
 from nlp_utils import generate_abstractive_summary
 from datetime import datetime, timedelta
-
+import calendar
 
 
 # pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -1906,7 +1906,7 @@ def get_document_shares(
 
     return shares
 
-from sqlalchemy import func
+from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 @app.get("/dashboard/stats")
@@ -1972,4 +1972,70 @@ def dashboard_stats(
         ]
     }
 
-#testfdfffdf testing only
+@app.get("/dashboard/upload-activity")
+def upload_activity(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    query = db.query(
+        extract("year", Document.uploaded_at).label("year"),
+        extract("month", Document.uploaded_at).label("month"),
+        func.count(Document.id)
+    )
+
+    # 📤 UPLOADER → PERSONAL DATA
+    if current_user.role == "Uploader":
+        query = query.filter(
+            Document.uploaded_by == current_user.email
+        )
+
+    # 👀 VIEWER / FACULTY / STAFF → NO DATA
+    elif current_user.role not in ["Admin"]:
+        return []
+
+    query = query.group_by("year", "month").order_by("year", "month")
+
+    results = query.all()
+
+    return [
+        {
+            "label": f"{calendar.month_abbr[int(r.month)]} {int(r.year)}",
+            "count": r[2]
+        }
+        for r in results
+    ]
+
+
+@app.get("/dashboard/document-type-distribution")
+def document_type_distribution(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    query = db.query(
+        Document.document_type,
+        func.count(Document.id)
+    )
+
+    # 📤 UPLOADER → PERSONAL DATA
+    if current_user.role == "Uploader":
+        query = query.filter(
+            Document.uploaded_by == current_user.email
+        )
+
+    # 👀 VIEWER / FACULTY / STAFF → NO DATA
+    elif current_user.role not in ["Admin"]:
+        return []
+
+    query = query.group_by(Document.document_type)
+
+    results = query.all()
+
+    return [
+        {
+            "type": r[0] or "Unknown",
+            "count": r[1]
+        }
+        for r in results
+    ]
