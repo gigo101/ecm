@@ -8,7 +8,6 @@ import Login from '@/views/Auth/Login.vue'
 import AdminUsers from '@/views/Admin/Users.vue'
 import NotFoundView from "@/views/NotFound.vue";
 import Login2 from '@/views/Login2.vue'; 
-import AddNumber from '@/views/AddNumbers.vue';
 import Register from '@/views/Auth/Register.vue'
 import UploadDocument from '@/views/Documents/UploadDocument.vue'
 import DocumentList from '@/views/Documents/DocumentList.vue'
@@ -68,10 +67,6 @@ const routes = [
 { 
     path: '/admin/users', 
     component: AdminUsers 
-},
-{ 
-    path: '/addnumber', 
-    component: AddNumber 
 },
 {
   path: "/change-password",
