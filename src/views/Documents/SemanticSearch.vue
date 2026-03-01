@@ -197,6 +197,12 @@ function downloadFile(filename) {
               <div class="font-medium">
                 {{ doc.filename }}
               </div>
+            <p
+            v-if="doc.summary"
+            class="text-sm text-gray-600 mt-1 line-clamp-3"
+          >
+            {{ doc.summary }}
+          </p>
 
               <!-- 👥 SHARED COUNT -->
               <div
