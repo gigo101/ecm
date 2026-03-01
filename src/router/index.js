@@ -16,7 +16,7 @@ import Profile from '@/views/Profile.vue'
 import Userlist from '@/views/Userlist.vue'
 import Positions from '@/views/Admin/Positions.vue'
 import Offices from '@/views/Admin/Offices.vue'
-
+fdfd
 
 const routes = [
 { 
