@@ -101,7 +101,8 @@ function openPreview(id) {
 
 function downloadFile(filename) {
   if (!metadata.value.filename) return;
-  window.open(`http://127.0.0.1:8000/uploads/${filename}`, "_blank");
+  const baseUrl = import.meta.env.VITE_API_URL;
+  window.open(`${baseUrl}/uploads/${filename}`, "_blank");
 }
 
 </script>

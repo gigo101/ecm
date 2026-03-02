@@ -246,8 +246,9 @@ watch(() => props.docId, async (id) => {
 /* DOWNLOAD */
 function downloadDocument() {
   const token = localStorage.getItem("token");
+  const baseUrl = import.meta.env.VITE_API_URL;
   window.open(
-    `http://127.0.0.1:8000/documents/download/${props.docId}?token=${token}`
+    `${baseUrl}/documents/download/${props.docId}?token=${token}`
   );
 }
 

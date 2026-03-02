@@ -66,9 +66,9 @@ async function fetchPreview() {
 
 function downloadFile() {
   const token = localStorage.getItem("token")
-
+  const baseUrl = import.meta.env.VITE_API_URL;
   window.open(
-    `http://127.0.0.1:8000/downloadables/download/${props.fileId}?token=${token}`,
+    `${baseUrl}/downloadables/download/${props.fileId}?token=${token}`,
     "_blank"
   )
 }

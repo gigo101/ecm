@@ -153,7 +153,8 @@ function filteredDocuments() {
 }
 
 function downloadFile(filename) {
-  window.open(`http://127.0.0.1:8000/uploads/${filename}`, "_blank");
+   const baseUrl = import.meta.env.VITE_API_URL;
+   window.open(`${baseUrl}/uploads/${filename}`, "_blank");
 }
 
 async function deleteDocument(id) {
