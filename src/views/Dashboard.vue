@@ -1,11 +1,11 @@
 <script setup>
 import { ref, onMounted } from "vue"
 import api from "@/api"
-import SharedWithMeWidget from "@/views/dashboard/SharedWithMeWidget.vue"
-import FavoritesWidget from "@/views/dashboard/FavoritesWidget.vue"
-import UploadActivityChart from "@/views/dashboard/UploadActivityChart.vue"
-import DocumentTypePieChart from "@/views/dashboard/DocumentTypePieChart.vue"
-import MostViewedWidget from "@/views/dashboard/MostViewedWidget.vue"
+import SharedWithMeWidget from "@/views/Dashboard/SharedWithMeWidget.vue"
+import FavoritesWidget from "@/views/Dashboard/FavoritesWidget.vue"
+import UploadActivityChart from "@/views/Dashboard/UploadActivityChart.vue"
+import DocumentTypePieChart from "@/views/Dashboard/DocumentTypePieChart.vue"
+import MostViewedWidget from "@/views/Dashboard/MostViewedWidget.vue"
 
 const role = ref("")
 const totalDocs = ref(0)
