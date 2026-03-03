@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, computed } from "vue"
 import api from "@/api"
 import DocumentPreviewModal from "@/views/Documents/DocumentPreviewModal.vue"
 import { useToast } from "vue-toastification"
@@ -11,10 +11,38 @@ const showPreview = ref(false)
 const previewId = ref(null)
 const toast = useToast()
 const role = ref(localStorage.getItem("role"))
+
 const page = ref(1)
 const limit = ref(10)
 const totalPages = ref(1)
 
+// SHARE STATES
+const showShareModal = ref(false)
+const selectedDoc = ref(null)
+const users = ref([])
+const selectedUsers = ref([])
+const existingShares = ref([])
+const userSearch = ref("")
+
+// COMPUTED: Filter available users
+const availableUsers = computed(() => {
+  return users.value
+    .filter(u =>
+      !existingShares.value.some(s => s.shared_to === u.email)
+    )
+    .filter(u => {
+      const term = userSearch.value.toLowerCase()
+      return (
+        u.first_name.toLowerCase().includes(term) ||
+        u.last_name.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term)
+      )
+    })
+})
+
+// ============================
+// FETCH MY UPLOADS
+// ============================
 async function fetchMyUploads() {
   loading.value = true
   error.value = ""
@@ -30,29 +58,41 @@ async function fetchMyUploads() {
     documents.value = res.data.data
     totalPages.value = res.data.pages
 
-  } catch (err) {
+  } catch {
     error.value = "Unable to load your uploads."
   } finally {
     loading.value = false
   }
 }
 
+// ============================
+// PAGINATION
+// ============================
 function changePage(newPage) {
   if (newPage < 1 || newPage > totalPages.value) return
   page.value = newPage
   fetchMyUploads()
 }
 
+// ============================
+// PREVIEW
+// ============================
 function openPreview(id) {
   previewId.value = id
   showPreview.value = true
 }
 
+// ============================
+// DOWNLOAD
+// ============================
 function downloadFile(filename) {
-  const baseUrl = import.meta.env.VITE_API_URL;
-   window.open(`${baseUrl}/uploads/${filename}`, "_blank");
+  const baseUrl = import.meta.env.VITE_API_URL
+  window.open(`${baseUrl}/uploads/${filename}`, "_blank")
 }
 
+// ============================
+// DELETE
+// ============================
 async function deleteDocument(id) {
   if (!confirm("Are you sure you want to delete this document?")) return
 
@@ -70,12 +110,75 @@ async function deleteDocument(id) {
   }
 }
 
+// ============================
+// SHARE LOGIC
+// ============================
+async function loadUsers() {
+  try {
+    const res = await api.get("/users")
+    users.value = res.data
+  } catch {
+    toast.error("Failed to load users")
+  }
+}
+
+async function openShareModal(doc) {
+  selectedDoc.value = doc
+  selectedUsers.value = []
+  userSearch.value = ""
+  showShareModal.value = true
+
+  await loadUsers()
+
+  const res = await api.get(`/documents/${doc.id}/shares`)
+  existingShares.value = res.data
+}
+
+async function revokeAccess(email) {
+  try {
+    await api.delete(
+      `/documents/${selectedDoc.value.id}/share/${email}`
+    )
+
+    existingShares.value =
+      existingShares.value.filter(s => s.shared_to !== email)
+
+    toast.success("Access revoked")
+  } catch {
+    toast.error("Failed to revoke access")
+  }
+}
+
+async function shareDocument() {
+  try {
+
+    if (selectedUsers.value.length === 0) {
+      toast.warning("Select at least one user")
+      return
+    }
+
+    await api.post(`/documents/${selectedDoc.value.id}/share`, {
+      users: selectedUsers.value
+    })
+
+    toast.success("Document shared successfully")
+
+    setTimeout(() => {
+      showShareModal.value = false
+    }, 200)
+
+  } catch {
+    toast.error("Failed to share document")
+  }
+}
+
 onMounted(fetchMyUploads)
 </script>
 
 <template>
   <div class="p-8">
 
+    <!-- HEADER -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold text-dns_dark">My Uploads</h1>
 
@@ -90,6 +193,7 @@ onMounted(fetchMyUploads)
     <div v-if="loading">Loading...</div>
     <div v-if="error" class="text-red-600">{{ error }}</div>
 
+    <!-- TABLE -->
     <table
       v-if="documents.length"
       class="w-full bg-white shadow-lg rounded-lg overflow-hidden"
@@ -113,18 +217,18 @@ onMounted(fetchMyUploads)
           class="border-b hover:bg-gray-100"
         >
           <td class="p-3">
-              <div class="font-medium">
-                {{ doc.filename }}
-              </div>
+            <div class="font-medium">
+              {{ doc.filename }}
+            </div>
 
-              <!-- 👥 SHARED COUNT -->
-              <div
-                v-if="doc.shared_count > 0 && (role === 'Admin' || role === 'Uploader')"
-                class="text-xs text-purple-600"
-              >
-                Shared with {{ doc.shared_count }} user(s)
-              </div>
+            <div
+              v-if="doc.shared_count > 0 && (role === 'Admin' || role === 'Uploader')"
+              class="text-xs text-purple-600"
+            >
+              Shared with {{ doc.shared_count }} user(s)
+            </div>
           </td>
+
           <td class="p-3">{{ doc.category }}</td>
 
           <td class="p-3 font-semibold">
@@ -148,23 +252,31 @@ onMounted(fetchMyUploads)
 
               <button
                 @click="openPreview(doc.id)"
-                class="bg-blue-600 text-white px-4 py-2 rounded"
+                class="bg-blue-600 text-white px-3 py-1 rounded"
               >
                 Preview
               </button>
 
               <button
                 @click="downloadFile(doc.filename)"
-                class="bg-green-600 text-white px-4 py-2 rounded"
+                class="bg-green-600 text-white px-3 py-1 rounded"
               >
                 Download
               </button>
 
               <button
                 @click="deleteDocument(doc.id)"
-                class="bg-red-600 text-white px-4 py-2 rounded"
+                class="bg-red-600 text-white px-3 py-1 rounded"
               >
                 Delete
+              </button>
+
+              <button
+                v-if="role==='Admin' || role==='Uploader'"
+                @click="openShareModal(doc)"
+                class="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
+              >
+                Share
               </button>
 
             </div>
@@ -177,7 +289,7 @@ onMounted(fetchMyUploads)
       You haven’t uploaded any documents yet.
     </div>
 
-    <!-- ⭐ PAGINATION -->
+    <!-- PAGINATION -->
     <div class="flex justify-center items-center gap-4 mt-6">
       <button
         @click="changePage(page - 1)"
@@ -199,9 +311,87 @@ onMounted(fetchMyUploads)
         Next
       </button>
     </div>
-
   </div>
 
+  <!-- SHARE MODAL -->
+  <div
+    v-if="showShareModal"
+    class="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+  >
+    <div class="bg-white p-6 rounded-lg w-96 shadow-lg">
+
+      <h2 class="text-lg font-bold mb-3">
+        Share {{ selectedDoc?.filename }}
+      </h2>
+
+      <div v-if="existingShares.length" class="mb-3">
+        <p class="font-semibold text-sm mb-1">Currently shared with:</p>
+
+        <div
+          v-for="s in existingShares"
+          :key="s.shared_to"
+          class="flex justify-between items-center bg-gray-100 px-2 py-1 rounded mb-1"
+        >
+          <span class="text-sm">{{ s.shared_to }}</span>
+
+          <button
+            @click="revokeAccess(s.shared_to)"
+            class="text-red-600 text-xs hover:underline"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+
+      <input
+        v-model="userSearch"
+        type="text"
+        placeholder="Search user..."
+        class="w-full border p-2 mb-2 rounded"
+      />
+
+      <select
+        v-model="selectedUsers"
+        multiple
+        class="w-full border p-2 mb-4 h-40"
+      >
+        <option
+          v-for="u in availableUsers"
+          :key="u.email"
+          :value="u.email"
+        >
+          {{ u.first_name }} {{ u.last_name }} — {{ u.email }}
+        </option>
+
+        <option v-if="availableUsers.length === 0" disabled>
+          No users found
+        </option>
+      </select>
+
+      <p class="text-xs text-gray-500 mb-3">
+        {{ selectedUsers.length }} user(s) selected
+      </p>
+
+      <div class="flex justify-end gap-2">
+        <button
+          @click="showShareModal=false"
+          class="px-3 py-1 bg-gray-300 rounded"
+        >
+          Cancel
+        </button>
+
+        <button
+          @click="shareDocument"
+          class="px-3 py-1 bg-purple-600 text-white rounded"
+        >
+          Share
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PREVIEW MODAL -->
   <DocumentPreviewModal
     :show="showPreview"
     :docId="previewId"

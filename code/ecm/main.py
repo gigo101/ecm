@@ -656,7 +656,7 @@ async def list_users(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    require_role(["Admin"])(current_user)
+    require_role(["Admin", "Uploader"])(current_user)
 
     users = db.query(User).all()
     return [

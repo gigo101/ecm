@@ -304,7 +304,7 @@ onMounted(fetchDocuments);
               </button>
 
               <button
-                  v-if="role==='Admin' || role==='Uploader'"
+                  v-if="role==='Admin'"
                   @click="openShareModal(doc)"
                   class="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
                 >
@@ -362,7 +362,7 @@ onMounted(fetchDocuments);
 
   </div>
 
-   <div
+  <div
   v-if="showShareModal"
   class="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
 >
