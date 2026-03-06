@@ -1817,43 +1817,6 @@ async def delete_downloadable(
     return {"message": "File deleted successfully"}
 
 
-# @app.post("/documents/{doc_id}/share")
-# def share_document(
-#     doc_id: int,
-#     data: ShareRequest,
-#     current_user=Depends(get_current_user),
-#     db: Session = Depends(get_db)
-# ):
-#     require_role(["Admin", "Uploader"])(current_user)
-
-#     print("🔥 SHARE ENDPOINT HIT")
-#     print("DOC ID:", doc_id)
-#     print("USERS:", data.users)
-
-#     if not data.users:
-#         raise HTTPException(400, "No users provided")
-
-#     doc = db.query(Document).filter(Document.id == doc_id).first()
-#     if not doc:
-#         raise HTTPException(404, "Document not found")
-
-#     for email in data.users:
-
-#         print("➡ inserting for:", email)
-
-#         db.add(DocumentShare(
-#             document_id=doc_id,
-#             shared_by=current_user.email,
-#             shared_to=email
-#         ))
-
-#     db.commit()
-
-#     print("✅ SHARE SAVED")
-
-#     return {"message": "Document shared successfully"}
-
-
 @app.post("/documents/{doc_id}/share")
 def share_document(
     doc_id: int,
@@ -1906,7 +1869,7 @@ def share_document(
     db.commit()
 
     return {"message": f"Shared with {shared_count} user(s)"}
-#testing 123
+
 
 @app.get("/documents/shared-with-me")
 def shared_with_me(
