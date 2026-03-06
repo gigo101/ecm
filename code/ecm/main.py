@@ -1817,6 +1817,43 @@ async def delete_downloadable(
     return {"message": "File deleted successfully"}
 
 
+# @app.post("/documents/{doc_id}/share")
+# def share_document(
+#     doc_id: int,
+#     data: ShareRequest,
+#     current_user=Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     require_role(["Admin", "Uploader"])(current_user)
+
+#     print("🔥 SHARE ENDPOINT HIT")
+#     print("DOC ID:", doc_id)
+#     print("USERS:", data.users)
+
+#     if not data.users:
+#         raise HTTPException(400, "No users provided")
+
+#     doc = db.query(Document).filter(Document.id == doc_id).first()
+#     if not doc:
+#         raise HTTPException(404, "Document not found")
+
+#     for email in data.users:
+
+#         print("➡ inserting for:", email)
+
+#         db.add(DocumentShare(
+#             document_id=doc_id,
+#             shared_by=current_user.email,
+#             shared_to=email
+#         ))
+
+#     db.commit()
+
+#     print("✅ SHARE SAVED")
+
+#     return {"message": "Document shared successfully"}
+
+
 @app.post("/documents/{doc_id}/share")
 def share_document(
     doc_id: int,
@@ -1826,20 +1863,31 @@ def share_document(
 ):
     require_role(["Admin", "Uploader"])(current_user)
 
-    print("🔥 SHARE ENDPOINT HIT")
-    print("DOC ID:", doc_id)
-    print("USERS:", data.users)
-
-    if not data.users:
-        raise HTTPException(400, "No users provided")
-
     doc = db.query(Document).filter(Document.id == doc_id).first()
+
     if not doc:
         raise HTTPException(404, "Document not found")
 
+    if current_user.role == "Uploader" and doc.uploaded_by != current_user.email:
+        raise HTTPException(403, "You can only share your own documents")
+
+    shared_count = 0   # ⭐ ADD COUNTER
+
     for email in data.users:
 
-        print("➡ inserting for:", email)
+        if email == doc.uploaded_by:
+            continue
+
+        if email == current_user.email:
+            continue
+
+        existing = db.query(DocumentShare).filter(
+            DocumentShare.document_id == doc_id,
+            DocumentShare.shared_to == email
+        ).first()
+
+        if existing:
+            continue
 
         db.add(DocumentShare(
             document_id=doc_id,
@@ -1847,11 +1895,17 @@ def share_document(
             shared_to=email
         ))
 
+        shared_count += 1   # ⭐ COUNT SUCCESS
+
+    if shared_count == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid users to share with"
+        )
+
     db.commit()
 
-    print("✅ SHARE SAVED")
-
-    return {"message": "Document shared successfully"}
+    return {"message": f"Shared with {shared_count} user(s)"}
 
 
 @app.get("/documents/shared-with-me")
