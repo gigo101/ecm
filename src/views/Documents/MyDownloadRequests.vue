@@ -47,8 +47,10 @@ function downloadDocument(docId) {
     return
   }
 
+   const baseUrl = import.meta.env.VITE_API_URL;
+
   const url =
-    `http://127.0.0.1:8000/documents/download/${docId}?token=${token}`
+    `${baseUrl}/documents/download/${docId}?token=${token}`
 
   window.location.href = url
 
