@@ -1463,21 +1463,69 @@ async def list_download_requests(
     ]
 
 
-@app.put("/admin/download-requests/{request_id}")
+# @app.put("/admin/download-requests/{request_id}")
+# async def update_download_request(
+#     request_id: int,
+#     status: str = Query(..., regex="^(APPROVED|REJECTED)$"),
+#     current_user = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     require_role(["Admin"])(current_user)
+
+#     req = db.query(DownloadRequest).filter(
+#         DownloadRequest.id == request_id
+#     ).first()
+
+#     if not req:
+#         raise HTTPException(404, "Request not found")
+
+#     req.status = status
+#     req.reviewed_at = datetime.utcnow()
+#     req.reviewed_by = current_user.email
+
+#     db.commit()
+
+#     return {"message": f"Request {status.lower()} successfully"}
+@app.put("/download-requests/{request_id}")
 async def update_download_request(
     request_id: int,
     status: str = Query(..., regex="^(APPROVED|REJECTED)$"),
     current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    require_role(["Admin"])(current_user)
-
+    
     req = db.query(DownloadRequest).filter(
         DownloadRequest.id == request_id
     ).first()
 
     if not req:
         raise HTTPException(404, "Request not found")
+
+    # Get document
+    doc = db.query(Document).filter(
+        Document.id == req.document_id
+    ).first()
+
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    # ✅ Admin can approve any request
+    if current_user.role == "Admin":
+        pass
+
+    # ✅ Uploader can approve ONLY their document
+    elif current_user.role == "Uploader":
+        if doc.uploaded_by != current_user.email:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only approve requests for your own documents"
+            )
+
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
 
     req.status = status
     req.reviewed_at = datetime.utcnow()
@@ -1486,7 +1534,6 @@ async def update_download_request(
     db.commit()
 
     return {"message": f"Request {status.lower()} successfully"}
-
 
 
 @app.get("/documents/my-download-requests")
@@ -2103,4 +2150,51 @@ def most_viewed_documents(
 
 
 
-#test only
+@app.get("/download-requests/pending-for-me")
+async def pending_requests_for_me(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    # -------------------------
+    # ADMIN → see all requests
+    # -------------------------
+    if current_user.role == "Admin":
+
+        requests = (
+            db.query(DownloadRequest, Document.filename)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .order_by(DownloadRequest.requested_at.desc())
+            .all()
+        )
+
+    # -------------------------
+    # UPLOADER → only own docs
+    # -------------------------
+    elif current_user.role == "Uploader":
+
+        requests = (
+            db.query(DownloadRequest, Document.filename)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .filter(Document.uploaded_by == current_user.email)
+            .order_by(DownloadRequest.requested_at.desc())
+            .all()
+        )
+
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    result = []
+
+    for req, filename in requests:
+        result.append({
+            "id": req.id,
+            "document_id": req.document_id,
+            "document_name": filename,
+            "requester_email": req.requester_email,
+            "reason": req.reason,
+            "status": req.status,
+            "requested_at": req.requested_at.strftime("%Y-%m-%d %H:%M")
+        })
+
+    return result
