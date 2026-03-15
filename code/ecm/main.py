@@ -2198,3 +2198,35 @@ async def pending_requests_for_me(
         })
 
     return result
+
+
+@app.get("/notifications/pending-requests")
+def pending_request_notifications(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    # ADMIN → all pending
+    if current_user.role == "Admin":
+
+        count = db.query(DownloadRequest).filter(
+            DownloadRequest.status == "PENDING"
+        ).count()
+
+    # UPLOADER → pending requests for own docs
+    elif current_user.role == "Uploader":
+
+        count = (
+            db.query(DownloadRequest)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .filter(
+                Document.uploaded_by == current_user.email,
+                DownloadRequest.status == "PENDING"
+            )
+            .count()
+        )
+
+    else:
+        return {"count": 0}
+
+    return {"count": count}
