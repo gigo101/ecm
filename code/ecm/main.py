@@ -2230,3 +2230,48 @@ def pending_request_notifications(
         return {"count": 0}
 
     return {"count": count}
+
+
+@app.get("/notifications/pending-request-list")
+def notification_list(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    if current_user.role == "Admin":
+
+        requests = (
+            db.query(DownloadRequest, Document.filename)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .filter(DownloadRequest.status == "PENDING")
+            .order_by(DownloadRequest.requested_at.desc())
+            .limit(5)
+            .all()
+        )
+
+    elif current_user.role == "Uploader":
+
+        requests = (
+            db.query(DownloadRequest, Document.filename)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .filter(
+                Document.uploaded_by == current_user.email,
+                DownloadRequest.status == "PENDING"
+            )
+            .order_by(DownloadRequest.requested_at.desc())
+            .limit(5)
+            .all()
+        )
+
+    else:
+        return []
+
+    return [
+        {
+            "id": r.id,
+            "document": filename,
+            "requester": r.requester_email,
+            "time": r.requested_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for r, filename in requests
+    ]

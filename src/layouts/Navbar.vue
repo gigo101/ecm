@@ -10,22 +10,51 @@
 
     <!-- RIGHT SIDE -->
     <div class="flex items-center gap-6">
+        <div class="relative" ref="notificationRef">
+          <button
+            @click="toggleNotifications"
+            class="relative cursor-pointer"
+          >
+            <i class="pi pi-bell text-dns_dark text-xl"></i>
+            <span
+              v-if="requestNotifications > 0"
+              class="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full"
+            >
+              {{ requestNotifications }}
+            </span>
+          </button>
+            <!-- 🔔 Notification Dropdown -->
+            <div
+              v-if="showNotifications"
+              class="absolute right-0 mt-3 w-80 bg-white shadow-xl rounded-lg border z-50"
+            >
+              <div class="px-4 py-2 border-b font-semibold text-gray-700">
+                Notifications
+              </div>
+              <div v-if="notifications.length === 0" class="p-4 text-sm text-gray-500">
+                No new requests
+              </div>
+              <router-link
+                v-for="n in notifications"
+                :key="n.id"
+                to="/my-download-requests"
+                class="block px-4 py-3 hover:bg-gray-100 border-b"
+                @click="showNotifications=false"
+              >
+                <div class="text-sm font-medium text-gray-800">
+                  {{ n.requester }}
+                </div>
 
-      <!-- 🔔 NOTIFICATION BELL -->
-      <router-link
-        to="/my-download-requests"
-        class="relative cursor-pointer"
-      >
-        <i class="pi pi-bell text-dns_dark text-xl"></i>
+                <div class="text-xs text-gray-500">
+                  requested {{ n.document }}
+                </div>
 
-        <span
-          v-if="requestNotifications > 0"
-          class="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full"
-        >
-          {{ requestNotifications }}
-        </span>
-      </router-link>
-
+                <div class="text-xs text-gray-400 mt-1">
+                  {{ n.time }}
+                </div>
+              </router-link>
+            </div>
+          </div>
 
       <!-- PROFILE MENU -->
       <div class="relative" ref="containerRef">
@@ -119,6 +148,9 @@ const userName = ref("Account")
 
 /* 🔔 Notification count */
 const requestNotifications = ref(0)
+const notifications = ref([])
+const showNotifications = ref(false)
+const notificationRef = ref(null)
 
 /* Toggle dropdown */
 function toggleMenu() {
@@ -156,6 +188,22 @@ async function fetchUser() {
 }
 
 
+async function loadNotificationList() {
+
+  try {
+
+    const res = await api.get("/notifications/pending-request-list")
+
+    notifications.value = res.data
+
+  } catch (err) {
+
+    console.error("Failed to load notification list", err)
+
+  }
+
+}
+
 /* Load notifications */
 async function loadNotifications() {
 
@@ -165,12 +213,18 @@ async function loadNotifications() {
 
     requestNotifications.value = res.data.count
 
+    await loadNotificationList()
+
   } catch (err) {
 
-    console.error("Failed to load notifications:", err)
+    console.error("Failed to load notifications", err)
 
   }
 
+}
+
+function toggleNotifications() {
+  showNotifications.value = !showNotifications.value
 }
 
 
