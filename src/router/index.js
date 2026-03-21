@@ -145,6 +145,14 @@ const routes = [
   component: () => import("@/views/Documents/SharedDocuments.vue")
 },
 
+{
+  path: "/documents/procedures-manual",
+  component: () => import("@/views/Documents/ISOProcedures.vue")
+},
+{
+  path: "/iso-procedures/upload",
+  component: () => import("@/views/Documents/IsoUpload.vue")
+},
 
 { 
     path: '/:catchAll(.*)', 

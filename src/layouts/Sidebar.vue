@@ -61,7 +61,14 @@ const role = ref(localStorage.getItem("role"));
       <router-link to="/documents/downloadable" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">
         <i class="pi pi-align-justify"></i>
       Downloadable Forms
-    </router-link>
+      </router-link>
+       <router-link to="/documents/procedures-manual" class="flex items-center gap-3 p-3 rounded hover:bg-dns_green">
+        <i class="pi pi-align-justify"></i>
+      Procedures Manual
+      </router-link>
+
+
+    
 
 
 

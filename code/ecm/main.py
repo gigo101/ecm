@@ -205,6 +205,17 @@ class DocumentShare(Base):
 class ShareRequest(BaseModel):
     users: list[str]  # list of emails
 
+
+class IsoProcedure(Base):
+    __tablename__ = "iso_procedures"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255))
+    filepath = Column(String(500))
+    uploaded_by = Column(String(255))
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+
 Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
 def get_db():
@@ -2275,3 +2286,85 @@ def notification_list(
         }
         for r, filename in requests
     ]
+
+@app.post("/iso-procedures/upload")
+async def upload_iso(
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    file_location = os.path.join("uploads", file.filename)
+
+    with open(file_location, "wb+") as f:
+        f.write(await file.read())
+
+    new_file = IsoProcedure(
+        filename=file.filename,
+        filepath=file_location,
+        uploaded_by=current_user.email
+    )
+
+    db.add(new_file)
+    db.commit()
+
+    return {"message": "ISO Procedure uploaded successfully"}
+
+
+@app.get("/iso-procedures/list")
+async def list_iso(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    files = db.query(IsoProcedure).order_by(IsoProcedure.uploaded_at.desc()).all()
+
+    return [
+        {
+            "id": f.id,
+            "filename": f.filename,
+            "uploaded_by": f.uploaded_by,
+            "uploaded_at": f.uploaded_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for f in files
+    ]
+
+@app.get("/iso-procedures/preview/{id}")
+async def preview_iso(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    file = db.query(IsoProcedure).filter(IsoProcedure.id == id).first()
+
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    return FileResponse(
+        path=file.filepath,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"}
+    )
+    
+
+@app.delete("/iso-procedures/{id}")
+async def delete_iso(
+    id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    file = db.query(IsoProcedure).filter(IsoProcedure.id == id).first()
+
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    if os.path.exists(file.filepath):
+        os.remove(file.filepath)
+
+    db.delete(file)
+    db.commit()
+
+    return {"message": "Deleted successfully"}
+
