@@ -26,8 +26,11 @@ async function handleLogin() {
     const token = response.data.access_token;
     localStorage.setItem("token", token);
 
-    // FETCH USER PROFILE
+    // ✅ set globally
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
     const user = await api.get("/users/me");
+    
     localStorage.setItem("role", user.data.role);
     localStorage.setItem("name", user.data.name);
 
