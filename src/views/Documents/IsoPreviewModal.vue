@@ -1,6 +1,14 @@
 <script setup>
 import { ref, watch } from "vue"
 import api from "@/api"
+import VuePdfEmbed from "vue-pdf-embed"
+
+const isPDF = ref(false)
+
+function detectType(filename) {
+  const ext = filename.split(".").pop().toLowerCase()
+  isPDF.value = ext === "pdf"
+}
 
 const props = defineProps({
   show: Boolean,
@@ -20,6 +28,11 @@ watch(() => props.fileId, async (id) => {
   isLoading.value = true
 
   try {
+
+    const meta = await api.get(`/iso-procedures/list`)
+    const file = meta.data.find(f => f.id === id)
+
+    detectType(file.filename)
 
     const res = await api.get(`/iso-procedures/preview/${id}`, {
       responseType: "blob"
@@ -52,6 +65,7 @@ function close() {
   <div
     v-if="show"
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    @contextmenu.prevent
   >
     <div class="bg-white w-11/12 max-w-5xl p-6 rounded-xl shadow-xl relative">
 
@@ -72,12 +86,32 @@ function close() {
         Loading...
       </div>
 
-      <!-- PDF VIEW -->
-      <iframe
-        v-if="fileUrl && !isLoading"
-        :src="fileUrl"
-        class="w-full h-[75vh] border rounded"
-      />
+      <!-- PDF (NO TOOLBAR) -->
+      <div
+        v-else-if="isPDF"
+        class="h-[75vh] overflow-auto border rounded bg-gray-50 relative"
+      >
+        <!-- WATERMARK -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span class="text-gray-300 text-5xl rotate-[-30deg] opacity-20">
+            CONFIDENTIAL
+          </span>
+        </div>
+
+        <VuePdfEmbed
+          v-if="fileUrl"
+          :source="fileUrl"
+          class="w-full"
+        />
+      </div>
+
+      <!-- IMAGE -->
+      <div
+        v-else
+        class="flex justify-center items-center h-[75vh]"
+      >
+        <img :src="fileUrl" class="max-h-full max-w-full" />
+      </div>
 
     </div>
   </div>

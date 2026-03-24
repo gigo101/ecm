@@ -69,12 +69,13 @@ function filteredForms() {
 
 function downloadFile(id) {
   const token = localStorage.getItem("token")
-
+  const baseUrl = import.meta.env.VITE_API_URL;
   window.open(
-    `http://127.0.0.1:8000/downloadables/download/${id}?token=${token}`,
+    `${baseUrl}/downloadables/download/${id}?token=${token}`,
     "_blank"
   )
 }
+
 
 async function deleteFile(id) {
   if (!confirm("Delete this file?")) return
