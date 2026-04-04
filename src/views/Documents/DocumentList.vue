@@ -4,7 +4,9 @@ import api from "@/api";
 import DocumentPreviewModal from "@/views/Documents/DocumentPreviewModal.vue";
 import { useToast } from "vue-toastification";
 import { computed } from "vue"
+import 'primeicons/primeicons.css'
 
+const openMenuId = ref(null)
 const availableUsers = computed(() => {
   return users.value
     .filter(u =>
@@ -41,6 +43,9 @@ const selectedUsers = ref([]);
 const existingShares = ref([]);
 const userSearch = ref("");
 
+function toggleMenu(id) {
+  openMenuId.value = openMenuId.value === id ? null : id
+}
 async function loadUsers() {
   try {
     const res = await api.get("/users")
@@ -274,58 +279,85 @@ onMounted(fetchDocuments);
           <td class="p-3">{{ doc.uploaded_at }}</td>
 
           <!-- ACTIONS -->
-          <td class="p-3">
-            <div class="flex justify-center gap-2">
+<td class="p-3">
+  <div class="flex justify-center items-center gap-1">
 
-              <!-- PREVIEW -->
-              <button
-                @click="openPreview(doc.id)"
-                class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-              >
-                Preview
-              </button>
+    <!-- FAVORITE -->
+    <button
+      @click="toggleFavorite(doc)"
+      class="p-2 rounded transition"
+      :class="doc.is_favorite
+        ? 'text-yellow-500'
+        : 'text-gray-400 hover:text-yellow-500'"
+      title="Favorite"
+    >
+      <i class="pi pi-star-fill" v-if="doc.is_favorite"></i>
+      <i class="pi pi-star" v-else></i>
+    </button>
 
-              <!-- DOWNLOAD -->
-              <button
-                v-if="role !== 'Viewer'"
-                @click="downloadFile(doc.filename)"
-                class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-              >
-                Download
-              </button>
+    <!-- PREVIEW -->
+    <button
+      @click="openPreview(doc.id)"
+      class="p-2 hover:bg-gray-200 rounded"
+      title="Preview"
+    >
+      <i class="pi pi-eye"></i>
+    </button>
 
-              <!-- DELETE -->
-              <button
-                v-if="role === 'Admin' || role === 'Uploader'"
-                @click="deleteDocument(doc.id)"
-                class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-              >
-                Delete
-              </button>
+    <!-- DOWNLOAD -->
+    <button
+      v-if="role !== 'Viewer'"
+      @click="downloadFile(doc.filename)"
+      class="p-2 hover:bg-gray-200 rounded"
+      title="Download"
+    >
+      <i class="pi pi-download"></i>
+    </button>
 
-              <button
-                  v-if="role==='Admin'"
-                  @click="openShareModal(doc)"
-                  class="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
-                >
-                  Share
-             </button>
+    <!-- MORE MENU -->
+    <div class="relative">
 
-            </div>
-          </td>
+      <button
+        @click="toggleMenu(doc.id)"
+        class="p-2 hover:bg-gray-200 rounded"
+        title="More"
+      >
+        <i class="pi pi-ellipsis-v"></i>
+      </button>
+
+      <!-- DROPDOWN -->
+      <div
+        v-if="openMenuId === doc.id"
+        class="absolute right-0 mt-2 w-36 bg-white border rounded shadow-lg z-50"
+      >
+
+        <button
+          v-if="role==='Admin'"
+          @click="openShareModal(doc); openMenuId = null"
+          class="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-100"
+        >
+          <i class="pi pi-share-alt"></i>
+          Share
+        </button>
+
+        <button
+          v-if="role === 'Admin' || role === 'Uploader'"
+          @click="deleteDocument(doc.id); openMenuId = null"
+          class="flex items-center gap-2 w-full px-3 py-2 text-red-600 hover:bg-gray-100"
+        >
+          <i class="pi pi-trash"></i>
+          Delete
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+</td>
 
           <!-- FAVORITE -->
-          <td class="p-3 text-center">
-            <button
-              @click="toggleFavorite(doc)"
-              class="px-3 py-2 rounded"
-              :class="doc.is_favorite
-                ? 'bg-yellow-500 text-white'
-                : 'bg-gray-300'"
-            >
-              ★
-            </button>
-          </td>
+
 
         </tr>
       </tbody>

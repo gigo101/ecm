@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from "vue"
 import api from "@/api"
 import DocumentPreviewModal from "@/views/Documents/DocumentPreviewModal.vue"
 import { useToast } from "vue-toastification"
+import 'primeicons/primeicons.css'
 
 const documents = ref([])
 const loading = ref(true)
@@ -23,6 +24,12 @@ const users = ref([])
 const selectedUsers = ref([])
 const existingShares = ref([])
 const userSearch = ref("")
+
+const openMenuId = ref(null)
+
+function toggleMenu(id) {
+  openMenuId.value = openMenuId.value === id ? null : id
+}
 
 // COMPUTED: Filter available users
 const availableUsers = computed(() => {
@@ -246,41 +253,67 @@ onMounted(fetchMyUploads)
           <td class="p-3">{{ doc.year_approved }}</td>
           <td class="p-3">{{ doc.uploaded_by }}</td>
           <td class="p-3">{{ doc.uploaded_at }}</td>
+<td class="p-3">
+  <div class="flex justify-center items-center gap-1">
 
-          <td class="p-3 text-center">
-            <div class="flex justify-center gap-2">
+    <!-- PREVIEW -->
+    <button
+      @click="openPreview(doc.id)"
+      class="p-2 w-9 h-9 flex items-center justify-center rounded hover:bg-gray-200 transition"
+      title="Preview"
+    >
+      <i class="pi pi-eye"></i>
+    </button>
 
-              <button
-                @click="openPreview(doc.id)"
-                class="bg-blue-600 text-white px-3 py-1 rounded"
-              >
-                Preview
-              </button>
+    <!-- DOWNLOAD -->
+    <button
+      @click="downloadFile(doc.filename)"
+      class="p-2 w-9 h-9 flex items-center justify-center rounded hover:bg-gray-200 transition"
+      title="Download"
+    >
+      <i class="pi pi-download"></i>
+    </button>
 
-              <button
-                @click="downloadFile(doc.filename)"
-                class="bg-green-600 text-white px-3 py-1 rounded"
-              >
-                Download
-              </button>
+    <!-- MORE MENU -->
+    <div class="relative">
 
-              <button
-                @click="deleteDocument(doc.id)"
-                class="bg-red-600 text-white px-3 py-1 rounded"
-              >
-                Delete
-              </button>
+      <button
+        @click="toggleMenu(doc.id)"
+        class="p-2 w-9 h-9 flex items-center justify-center rounded hover:bg-gray-200 transition"
+        title="More"
+      >
+        <i class="pi pi-ellipsis-v"></i>
+      </button>
 
-              <button
-                v-if="role==='Admin' || role==='Uploader'"
-                @click="openShareModal(doc)"
-                class="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700"
-              >
-                Share
-              </button>
+      <!-- DROPDOWN -->
+      <div
+        v-if="openMenuId === doc.id"
+        class="absolute right-0 mt-2 w-36 bg-white border rounded shadow-lg z-50"
+      >
 
-            </div>
-          </td>
+        <button
+          v-if="role==='Admin' || role==='Uploader'"
+          @click="openShareModal(doc); openMenuId = null"
+          class="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-100"
+        >
+          <i class="pi pi-share-alt"></i>
+          Share
+        </button>
+
+        <button
+          @click="deleteDocument(doc.id); openMenuId = null"
+          class="flex items-center gap-2 w-full px-3 py-2 text-red-600 hover:bg-gray-100"
+        >
+          <i class="pi pi-trash"></i>
+          Delete
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+</td>
         </tr>
       </tbody>
     </table>
