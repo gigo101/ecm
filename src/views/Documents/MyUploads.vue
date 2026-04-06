@@ -219,7 +219,7 @@ onMounted(fetchMyUploads)
 
       <tbody>
         <tr
-          v-for="doc in documents"
+          v-for="(doc, index) in documents"
           :key="doc.id"
           class="border-b hover:bg-gray-100"
         >
@@ -286,10 +286,15 @@ onMounted(fetchMyUploads)
       </button>
 
       <!-- DROPDOWN -->
-      <div
-        v-if="openMenuId === doc.id"
-        class="absolute right-0 mt-2 w-36 bg-white border rounded shadow-lg z-50"
-      >
+    <div
+  v-if="openMenuId === doc.id"
+  :class="[
+    'absolute right-0 w-36 bg-white border rounded shadow-lg z-50',
+    index >= documents.length - 2
+      ? 'bottom-full mb-2'
+      : 'mt-2'
+  ]"
+>
 
         <button
           v-if="role==='Admin' || role==='Uploader'"

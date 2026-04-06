@@ -245,7 +245,7 @@ onMounted(fetchDocuments);
       </thead>
 
       <tbody>
-        <tr v-for="doc in filteredDocuments()" :key="doc.id"
+        <tr v-for="(doc, index) in filteredDocuments()" :key="doc.id"
             class="border-b hover:bg-gray-100">
 
           <td class="p-3">
@@ -327,9 +327,14 @@ onMounted(fetchDocuments);
 
       <!-- DROPDOWN -->
       <div
-        v-if="openMenuId === doc.id"
-        class="absolute right-0 mt-2 w-36 bg-white border rounded shadow-lg z-50"
-      >
+          v-if="openMenuId === doc.id"
+          :class="[
+            'absolute right-0 w-36 bg-white border rounded shadow-lg z-50',
+            index >= documents.length - 2
+              ? 'bottom-full mb-2'
+              : 'mt-2'
+          ]"
+        >
 
         <button
           v-if="role==='Admin'"
