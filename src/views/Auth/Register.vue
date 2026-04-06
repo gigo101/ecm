@@ -30,6 +30,10 @@ const loading = ref(false);
 const error = ref("");
 const success = ref("");
 
+
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+
 // LOAD POSITIONS & OFFICES FROM API
 onMounted(async () => {
   try {
@@ -234,12 +238,42 @@ async function handleRegister() {
 
           <div>
             <label class="block text-gray-700 mb-1 text-sm">Password</label>
-            <input type="password" v-model="password" required class="w-full p-3 border rounded-lg" />
+            <div class="relative">
+              <input
+                :type="showPassword ? 'text' : 'password'"
+                v-model="password"
+                required
+                class="w-full p-3 pr-10 border rounded-lg"
+              />
+
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                <i :class="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
+              </button>
+            </div>
           </div>
 
           <div>
             <label class="block text-gray-700 mb-1 text-sm">Confirm Password</label>
-            <input type="password" v-model="confirmPassword" required class="w-full p-3 border rounded-lg" />
+            <div class="relative">
+              <input
+                :type="showConfirmPassword ? 'text' : 'password'"
+                v-model="confirmPassword"
+                required
+                class="w-full p-3 pr-10 border rounded-lg"
+              />
+
+              <button
+                type="button"
+                @click="showConfirmPassword = !showConfirmPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              >
+                <i :class="showConfirmPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
+              </button>
+            </div>
           </div>
 
           <div class="flex justify-between">
