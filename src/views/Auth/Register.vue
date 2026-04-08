@@ -31,8 +31,8 @@ const error = ref("");
 const success = ref("");
 
 
-const showPassword = ref(false)
-const showConfirmPassword = ref(false)
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 
 // LOAD POSITIONS & OFFICES FROM API
 onMounted(async () => {

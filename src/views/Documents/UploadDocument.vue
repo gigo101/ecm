@@ -84,6 +84,7 @@ async function uploadDocument() {
   }
 }
 
+
 // Cleanup on destroy
 onUnmounted(() => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
@@ -96,11 +97,32 @@ onUnmounted(() => {
     <h1 class="text-2xl font-bold mb-4">Upload Document</h1>
 
     <div class="bg-white p-6 rounded-xl shadow-lg space-y-4">
-      <input
-        type="file"
-        @change="handleFileChange"
-        class="p-2 border rounded w-full"
-      />
+<div class="space-y-2">
+
+  <!-- HIDDEN INPUT -->
+  <input
+    type="file"
+    ref="fileInput"
+    class="hidden"
+    @change="handleFileChange"
+  />
+
+  <!-- CUSTOM BUTTON -->
+  <button
+    type="button"
+    @click="$refs.fileInput.click()"
+    class="flex items-center gap-2 px-4 py-2 bg-green-700 hover:bg-green-800 text-white rounded-lg shadow"
+  >
+    <i class="pi pi-upload"></i>
+    Choose File
+  </button>
+
+  <!-- FILE NAME -->
+<p class="text-sm text-gray-600">
+  {{ selectedFile?.name || "No file selected" }}
+</p>
+
+</div>
 
             <!-- FILE PREVIEW -->
       <div v-if="selectedFile" class="border rounded-lg p-4 bg-gray-50 space-y-3">

@@ -9,6 +9,8 @@ const password = ref("");       // prefill for testing
 const loading = ref(false);
 const error = ref("");
 
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 
 async function handleLogin() {
   try {
@@ -100,13 +102,22 @@ async function handleLogin() {
           <label class="block text-gray-700 mb-2 text-sm font-medium">
             Password
           </label>
-          <input
-            v-model="password"
-            type="password"
-            placeholder="••••••••"
-            required
-            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition"
-          />
+            <div class="relative">
+            <input
+              :type="showPassword ? 'text' : 'password'"
+              v-model="password"
+              required
+              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition"
+            />
+
+            <button
+              type="button"
+              @click="showPassword = !showPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            >
+              <i :class="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
+            </button>
+          </div>
         </div>
 
         <div v-if="error" class="text-red-600 text-sm text-center">
