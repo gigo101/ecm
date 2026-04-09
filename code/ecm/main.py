@@ -285,7 +285,7 @@ async def login(
         raise HTTPException(status_code=400, detail="Invalid username or password")
 
     # Create token
-    payload = {"sub": user.email, "exp": time.time() + 3600}
+    payload = {"sub": user.email, "exp": time.time() + 86400} # 24 hours expiration
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"access_token": token, "token_type": "bearer"}
