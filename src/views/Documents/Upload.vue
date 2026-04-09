@@ -37,6 +37,7 @@
                 <input type="file" @change="onFile" />
             </div>
             <button class="px-4 py-2 bg-dns_dark text-white rounded">Upload</button>
+            
         </form>
     </div>
 </template>
