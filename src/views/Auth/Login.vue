@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import api from "@/api";
 import { useRouter } from "vue-router";
-
+import bgImage from "@/assets/img/bg-1.jpg"
 const router = useRouter();
 const email = ref(""); // prefill for testing
 const password = ref("");       // prefill for testing
@@ -58,14 +58,22 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div
-    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-900 via-green-800 to-green-700 bg-cover bg-center"
-    style="background-image: url('/images/bg-building.jpg'); background-blend-mode: overlay;"
-  >
+<div
+  class="h-screen w-screen flex items-center justify-center bg-cover bg-center bg-no-repeat relative overflow-hidden"
+  :style="{ backgroundImage: `url(${bgImage})` }"
+>
+    <!-- OVERLAY -->
+  <div class="absolute inset-0 bg-green-900/70"></div>
     <div
       class="bg-white/80 backdrop-blur-lg p-10 rounded-3xl shadow-2xl w-full max-w-lg transition transform hover:scale-[1.01]"
     >
-<div class="flex flex-col items-center mb-10 text-center">
+
+      <!-- CONTENT -->
+
+    
+    <div class="bg-white/80 backdrop-blur-lg p-10 rounded-3xl shadow-2xl w-full max-w-lg">
+      <!-- your existing login content -->
+       <div class="flex flex-col items-center mb-10 text-center">
   <!-- APPLICATION TITLE -->
   <h1 class="text-2xl font-extrabold text-green-900 tracking-wide uppercase">
     Enterprise Content Management System
@@ -144,5 +152,10 @@ async function handleLogin() {
         </router-link>
       </p>
     </div>
+
+    </div>
+
   </div>
+
+
 </template>

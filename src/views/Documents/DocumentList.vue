@@ -238,7 +238,7 @@ onMounted(fetchDocuments);
           <th class="p-3 text-left">Type</th>
           <th class="p-3 text-left">Year</th>
           <th class="p-3 text-left">Uploaded By</th>
-          <th class="p-3 text-left">Date</th>
+          <!-- <th class="p-3 text-left">Date</th> -->
           <th class="p-3 text-center">Actions</th>
           <th class="p-3"></th>
         </tr>
@@ -276,7 +276,7 @@ onMounted(fetchDocuments);
 
           <td class="p-3">{{ doc.year_approved }}</td>
           <td class="p-3">{{ doc.uploaded_by }}</td>
-          <td class="p-3">{{ doc.uploaded_at }}</td>
+          <!-- <td class="p-3">{{ doc.uploaded_at }}</td> -->
 
           <!-- ACTIONS -->
 <td class="p-3">

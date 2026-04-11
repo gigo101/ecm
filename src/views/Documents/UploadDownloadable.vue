@@ -162,12 +162,12 @@ onUnmounted(() => {
           >
             {{ loading ? "Uploading..." : "Upload" }}
           </button>
-                  <button
-          @click="router.push('/documents/downloadable')"
-          class="px-6 py-3 bg-gray-300 rounded-lg hover:bg-gray-400 transition"
-        >
-          Cancel
-        </button>
+          <button
+              @click="router.push('/documents/downloadable')"
+              class="px-6 py-3 bg-gray-300 rounded-lg hover:bg-gray-400 transition"
+            >
+              Cancel
+          </button>
         </div>
 
       </form>

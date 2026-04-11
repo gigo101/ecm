@@ -11,7 +11,7 @@
 
   <div v-else class="min-h-screen flex bg-dns_beige">
     <div class="flex-1 flex flex-col">
-    <main class="p-6">
+    <main>
     <router-view />
 
     </main>

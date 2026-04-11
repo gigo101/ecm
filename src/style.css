@@ -10,5 +10,7 @@
 
 html, body, #app {
   height: 100%;
-  background-color: var(--color-dns_beige);
+  margin: 0;
+  padding: 0;
+  
 }
