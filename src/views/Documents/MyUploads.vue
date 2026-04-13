@@ -203,7 +203,7 @@ onMounted(fetchMyUploads)
     <!-- TABLE -->
     <table
       v-if="documents.length"
-      class="w-full bg-white shadow-lg rounded-lg overflow-hidden"
+      class="w-full bg-white shadow-lg rounded-lg"
     >
       <thead class="bg-green-700 text-white">
         <tr>

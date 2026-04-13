@@ -337,7 +337,7 @@ onMounted(fetchDocuments);
         >
 
         <button
-          v-if="role==='Admin'"
+          v-if="role==='Admin' || role==='Uploader'"
           @click="openShareModal(doc); openMenuId = null"
           class="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-100"
         >
