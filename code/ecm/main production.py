@@ -1260,32 +1260,12 @@ async def semantic_search(
         )
 
     docs = doc_query.all()
-    SIMILARITY_THRESHOLD = 0.2  # ✅ adjust if needed
 
     results = []
 
     for doc in docs:
         doc_embedding = np.array(doc.embedding).reshape(1, -1)
         score = cosine_similarity(query_embedding, doc_embedding)[0][0]
-
-        # ✅ OPTIONAL: normalize score (0 to 1 range)
-        # score = (score + 1) / 2
-
-        # ✅ KEYWORD BOOST (improves relevance)
-        keyword_boost = 0
-        query_lower = query.lower()
-
-        if query_lower in (doc.filename or "").lower():
-            keyword_boost += 0.1
-
-        if query_lower in (doc.category or "").lower():
-            keyword_boost += 0.1
-
-        final_score = score + keyword_boost
-
-        # ✅ FILTER OUT IRRELEVANT RESULTS
-        if final_score < SIMILARITY_THRESHOLD:
-            continue
 
         shared_count = db.query(DocumentShare).filter(
             DocumentShare.document_id == doc.id
@@ -1297,19 +1277,10 @@ async def semantic_search(
             "category": doc.category,
             "uploaded_by": doc.uploaded_by,
             "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-            "score": round(float(final_score), 3),  # ✅ use boosted score
+            "score": round(float(score), 3),
             "summary": doc.summary,
             "shared_count": shared_count
         })
-
-    # ✅ HANDLE NO RESULTS
-    if not results:
-        return {
-            "data": [],
-            "total": 0,
-            "pages": 1,
-            "message": "No relevant documents found"
-        }
 
     # sort by relevance
     results.sort(key=lambda x: x["score"], reverse=True)
