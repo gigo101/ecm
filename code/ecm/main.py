@@ -216,6 +216,16 @@ class IsoProcedure(Base):
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
 
+class LoginLog(Base):
+    __tablename__ = "login_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255))
+    status = Column(String(20))  # SUCCESS | FAILED
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
 def get_db():
@@ -261,35 +271,101 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 # --- LOGIN ---
 
+# @app.post("/auth/login", response_model=Token)
+# async def login(
+#     form_data: OAuth2PasswordRequestForm = Depends(),
+#     db: Session = Depends(get_db)
+# ):
+#     # Find user
+#     user = db.query(User).filter(User.email == form_data.username).first()
+
+#     # If user does not exist
+#     if not user:
+#         raise HTTPException(status_code=400, detail="Invalid username or password")
+
+#     # Block inactive users
+#     if not user.is_active:
+#         raise HTTPException(
+#             status_code=403,
+#             detail="Your account has been deactivated. Please contact the administrator."
+#         )
+
+#     # Password check
+#     if not verify_password(form_data.password, user.password):
+#         raise HTTPException(status_code=400, detail="Invalid username or password")
+
+#     # Create token
+#     payload = {"sub": user.email, "exp": time.time() + 86400} # 24 hours expiration
+#     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+#     return {"access_token": token, "token_type": "bearer"}
+
+from fastapi import Request
+
 @app.post("/auth/login", response_model=Token)
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    # Find user
     user = db.query(User).filter(User.email == form_data.username).first()
 
-    # If user does not exist
+    # Get metadata
+    ip = request.client.host
+    user_agent = request.headers.get("user-agent")
+
+    # ❌ USER NOT FOUND
     if not user:
+        db.add(LoginLog(
+            email=form_data.username,
+            status="FAILED",
+            ip_address=ip,
+            user_agent=user_agent
+        ))
+        db.commit()
+
         raise HTTPException(status_code=400, detail="Invalid username or password")
 
-    # Block inactive users
+    # ❌ INACTIVE USER
     if not user.is_active:
+        db.add(LoginLog(
+            email=user.email,
+            status="FAILED",
+            ip_address=ip,
+            user_agent=user_agent
+        ))
+        db.commit()
+
         raise HTTPException(
             status_code=403,
             detail="Your account has been deactivated. Please contact the administrator."
         )
 
-    # Password check
+    # ❌ WRONG PASSWORD
     if not verify_password(form_data.password, user.password):
+        db.add(LoginLog(
+            email=user.email,
+            status="FAILED",
+            ip_address=ip,
+            user_agent=user_agent
+        ))
+        db.commit()
+
         raise HTTPException(status_code=400, detail="Invalid username or password")
 
-    # Create token
-    payload = {"sub": user.email, "exp": time.time() + 86400} # 24 hours expiration
+    # ✅ SUCCESS LOGIN
+    db.add(LoginLog(
+        email=user.email,
+        status="SUCCESS",
+        ip_address=ip,
+        user_agent=user_agent
+    ))
+    db.commit()
+
+    payload = {"sub": user.email, "exp": time.time() + 86400}
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"access_token": token, "token_type": "bearer"}
-
 
 # Protected Route
 @app.get("/users/me")
@@ -2397,3 +2473,23 @@ async def delete_iso(
 
     return {"message": "Deleted successfully"}
 
+
+@app.get("/admin/login-logs")
+async def get_login_logs(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    logs = db.query(LoginLog).order_by(LoginLog.created_at.desc()).all()
+
+    return [
+        {
+            "email": l.email,
+            "status": l.status,
+            "ip_address": l.ip_address,
+            "device": l.user_agent,
+            "time": l.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        for l in logs
+    ]

@@ -215,7 +215,16 @@ class IsoProcedure(Base):
     uploaded_by = Column(String(255))
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
+class LoginLog(Base):
+    __tablename__ = "login_logs"
 
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255))
+    status = Column(String(20))  # SUCCESS | FAILED
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
 Base.metadata.create_all(bind=engine)
 # --- DB DEPENDENCY ---
 def get_db():

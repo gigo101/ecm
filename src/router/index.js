@@ -154,6 +154,11 @@ const routes = [
   component: () => import("@/views/Documents/IsoUpload.vue")
 },
 
+{
+  path: "/admin/login-logs",
+  component: () => import("@/views/Auth/LoginLogs.vue"),
+},
+
 { 
     path: '/:catchAll(.*)', 
     name: 'not-found',
