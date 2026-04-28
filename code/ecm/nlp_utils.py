@@ -57,158 +57,1690 @@ def extract_text_from_file(filepath: str):
         return ""
 
 
+# import spacy
+# nlp = spacy.load("en_core_web_sm")
+
+# import re
+
+# def classify_document(text: str):
+#     if not text or len(text.strip()) < 50:
+#         return "General"
+
+#     text = text.lower()
+#     doc = nlp(text)
+
+#     # -------------------------------
+#     # CATEGORY DEFINITIONS
+#     # -------------------------------
+#     scores = {
+#         "Administrative": 0,
+#         "Academics": 0,
+#         "Research": 0,
+#         "Policies": 0,
+#         "Official Issuances": 0,
+#         "News & Events": 0,
+#     }
+
+#     CATEGORY_KEYWORDS = {
+#         "Administrative": [
+#             "office", "administrative", "committee", "meeting",
+#             "attendance", "secretariat", "endorsement"
+#         ],
+#         "Academics": [
+#             "student", "faculty", "curriculum", "course",
+#             "syllabus", "lecture", "midterm", "finals"
+#         ],
+#         "Research": [
+#             "research", "study", "methodology", "abstract",
+#             "publication", "innovation", "terminal report"
+#         ],
+#         "Policies": [
+#             "policy", "policies", "guidelines", "procedures",
+#             "provision", "manual", "compliance"
+#         ],
+#         "Official Issuances": [
+#             "memorandum", "circular", "resolution",
+#             "special order", "directive", "moa", "agreement"
+#         ],
+#         "News & Events": [
+#             "event", "activity", "workshop", "celebration"
+#         ]
+#     }
+
+#     STRONG_PATTERNS = {
+#         "Policies": [
+#             r"policies,\s*guidelines\s*and\s*procedures",
+#             r"accounting manual",
+#             r"this circular is issued to prescribe",
+#             r"repealing clause",
+#         ],
+#         "Official Issuances": [
+#             r"circular no\.",
+#             r"memorandum of agreement",
+#             r"resolution no\.",
+#             r"effectivity",
+#         ],
+#         "Research": [
+#             r"terminal report",
+#             r"narrative report"
+#         ]
+#     }
+
+#     PRIORITY_ORDER = [
+#         "Policies",
+#         "Official Issuances",
+#         "Research",
+#         "Academics",
+#         "Administrative",
+#         "News & Events"
+#     ]
+
+#     # -------------------------------
+#     # 1. KEYWORD SCORING
+#     # -------------------------------
+#     for category, words in CATEGORY_KEYWORDS.items():
+#         for w in words:
+#             if w in text:
+#                 scores[category] += 2
+
+#     # -------------------------------
+#     # 2. STRONG PATTERN MATCHING
+#     # -------------------------------
+#     for category, patterns in STRONG_PATTERNS.items():
+#         for pattern in patterns:
+#             if re.search(pattern, text):
+#                 scores[category] += 15
+
+#     # -------------------------------
+#     # 3. STRUCTURAL SIGNALS
+#     # -------------------------------
+#     if "manual" in text:
+#         scores["Policies"] += 25
+
+#     if "prescribing" in text:
+#         scores["Policies"] += 20
+
+#     if "effectivity" in text:
+#         scores["Official Issuances"] += 10
+
+#     if "abstract" in text and "research" in text:
+#         scores["Research"] += 10
+
+#     # -------------------------------
+#     # 4. SAFE NER SIGNALS ONLY
+#     # -------------------------------
+#     for ent in doc.ents:
+#         if ent.label_ == "DATE":
+#             scores["Official Issuances"] += 1
+
+#     # -------------------------------
+#     # 5. POLICY OVERRIDE (CRITICAL FIX)
+#     # -------------------------------
+#     # if scores["Policies"] >= 30:
+#     #     return "Policies"
+    
+#     # Detect strong Official Issuance signals FIRST
+#     if (
+#         "special order" in text
+#         or "office special order" in text
+#         or "so no" in text
+#     ):
+#         return "Official Issuances"
+
+
+#     # Policy override ONLY for real policy documents
+#     if (
+#         scores["Policies"] >= 30
+#         and (
+#             "manual" in text
+#             or "policy" in text
+#             or "policies, guidelines and procedures" in text
+#             or "prescribing" in text
+#         )
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 6. CLEAN ADMIN NOISE
+#     # -------------------------------
+#     if scores["Administrative"] < 5:
+#         scores["Administrative"] = 0
+
+#     # -------------------------------
+#     # 7. FINAL DECISION (PRIORITY-AWARE)
+#     # -------------------------------
+#     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     top_score = sorted_scores[0][1]
+
+#     if top_score < 3:
+#         return "General"
+
+#     top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
+
+#     for category in PRIORITY_ORDER:
+#         if category in top_candidates:
+#             return category
+
+#     return sorted_scores[0][0]
+
+
+# import spacy
+# nlp = spacy.load("en_core_web_sm")
+
+# import re
+
+# def classify_document(text: str):
+#     if not text or len(text.strip()) < 50:
+#         return "General"
+
+#     text = text.lower()
+#     doc = nlp(text)
+
+#     # -------------------------------
+#     # CATEGORY DEFINITIONS
+#     # -------------------------------
+#     scores = {
+#         "Administrative": 0,
+#         "Academics": 0,
+#         "Research": 0,
+#         "Policies": 0,
+#         "Official Issuances": 0,
+#         "News & Events": 0,
+#     }
+
+#     CATEGORY_KEYWORDS = {
+#         "Administrative": [
+#             "office", "administrative", "committee", "meeting",
+#             "attendance", "secretariat", "endorsement"
+#         ],
+#         "Academics": [
+#             "student", "faculty", "curriculum", "course",
+#             "syllabus", "lecture", "midterm", "finals"
+#         ],
+#         "Research": [
+#             "research", "study", "methodology", "abstract",
+#             "publication", "innovation", "terminal report"
+#         ],
+#         "Policies": [
+#             "policy", "policies", "guidelines", "procedures",
+#             "provision", "manual", "compliance"
+#         ],
+#         "Official Issuances": [
+#             "memorandum", "circular", "resolution",
+#             "special order", "directive", "moa", "agreement"
+#         ],
+#         "News & Events": [
+#             "event", "activity", "workshop", "celebration"
+#         ]
+#     }
+
+#     STRONG_PATTERNS = {
+#         "Policies": [
+#             r"policies,\s*guidelines\s*and\s*procedures",
+#             r"accounting manual",
+#             r"this circular is issued to prescribe",
+#             r"repealing clause",
+#         ],
+#         "Official Issuances": [
+#             r"circular no\.",
+#             r"memorandum of agreement",
+#             r"resolution no\.",
+#             r"effectivity",
+#         ],
+#         "Research": [
+#             r"terminal report",
+#             r"narrative report"
+#         ]
+#     }
+
+#     PRIORITY_ORDER = [
+#         "Policies",
+#         "Official Issuances",
+#         "Research",
+#         "Academics",
+#         "Administrative",
+#         "News & Events"
+#     ]
+
+#     # -------------------------------
+#     # 0. 🔥 HARD RULES (TOP PRIORITY)
+#     # -------------------------------
+
+#     # ✅ Official Issuance detection (strong)
+#     if re.search(r"(special order|office special order|so no\.?\s*\d+)", text):
+#         return "Official Issuances"
+
+#     if re.search(r"(memorandum|circular no\.|resolution no\.)", text):
+#         return "Official Issuances"
+
+#     # ✅ Manual / User Guide detection (NEW FIX)
+#     if re.search(r"(user manual|manual\s*\d+\.\d+|system manual)", text):
+#         return "Policies"
+
+#     # OCR fallback (procedural structure)
+#     if "manual" in text and (
+#         "how to" in text or
+#         "step 1" in text or
+#         "step 2" in text
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 1. KEYWORD SCORING
+#     # -------------------------------
+#     for category, words in CATEGORY_KEYWORDS.items():
+#         for w in words:
+#             if w in text:
+#                 scores[category] += 2
+
+#     # -------------------------------
+#     # 2. STRONG PATTERN MATCHING
+#     # -------------------------------
+#     for category, patterns in STRONG_PATTERNS.items():
+#         for pattern in patterns:
+#             if re.search(pattern, text):
+#                 scores[category] += 15
+
+#     # -------------------------------
+#     # 3. STRUCTURAL SIGNALS
+#     # -------------------------------
+#     if "manual" in text:
+#         scores["Policies"] += 25
+
+#     if "prescribing" in text:
+#         scores["Policies"] += 20
+
+#     if "effectivity" in text:
+#         scores["Official Issuances"] += 10
+
+#     if "abstract" in text and "research" in text:
+#         scores["Research"] += 10
+
+#     # -------------------------------
+#     # 4. SAFE NER SIGNALS ONLY
+#     # -------------------------------
+#     for ent in doc.ents:
+#         if ent.label_ == "DATE":
+#             scores["Official Issuances"] += 1
+
+#     # -------------------------------
+#     # 5. POLICY OVERRIDE (REFINED)
+#     # -------------------------------
+#     if (
+#         scores["Policies"] >= 30
+#         and (
+#             "manual" in text
+#             or "policy" in text
+#             or "guidelines" in text
+#             or "procedures" in text
+#             or "prescribing" in text
+#         )
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 6. CLEAN ADMIN NOISE
+#     # -------------------------------
+#     if scores["Administrative"] < 5:
+#         scores["Administrative"] = 0
+
+#     # -------------------------------
+#     # 7. FINAL DECISION (PRIORITY-AWARE)
+#     # -------------------------------
+#     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     top_score = sorted_scores[0][1]
+
+#     if top_score < 3:
+#         return "General"
+
+#     top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
+
+#     for category in PRIORITY_ORDER:
+#         if category in top_candidates:
+#             return category
+
+#     return sorted_scores[0][0]
+
+# import spacy
+# import re
+
+# nlp = spacy.load("en_core_web_sm")
+
+
+# def classify_document(text: str):
+#     if not text or len(text.strip()) < 50:
+#         return "General"
+
+#     text = text.lower()
+#     doc = nlp(text)
+
+#     # -------------------------------
+#     # CATEGORY DEFINITIONS
+#     # -------------------------------
+#     scores = {
+#         "Administrative": 0,
+#         "Academics": 0,
+#         "Research": 0,
+#         "Policies": 0,
+#         "Official Issuances": 0,
+#         "News & Events": 0,
+#     }
+
+#     CATEGORY_KEYWORDS = {
+#         "Administrative": [
+#             "office", "administrative", "committee", "meeting",
+#             "attendance", "secretariat", "endorsement"
+#         ],
+#         "Academics": [
+#             "student", "faculty", "curriculum", "course",
+#             "syllabus", "lecture", "midterm", "finals"
+#         ],
+#         "Research": [
+#             "research", "study", "methodology", "abstract",
+#             "publication", "innovation", "terminal report"
+#         ],
+#         "Policies": [
+#             "policy", "policies", "guidelines", "procedures",
+#             "provision", "manual", "compliance"
+#         ],
+#         "Official Issuances": [
+#             "memorandum", "circular", "resolution",
+#             "special order", "directive", "moa", "agreement"
+#         ],
+#         "News & Events": [
+#             "event", "activity", "workshop", "celebration"
+#         ]
+#     }
+
+#     STRONG_PATTERNS = {
+#         "Policies": [
+#             r"policies,\s*guidelines\s*and\s*procedures",
+#             r"accounting manual",
+#             r"repealing clause",
+#         ],
+#         "Official Issuances": [
+#             r"\bcircular\s*no\.",
+#             r"\bmemorandum\s*no\.",
+#             r"\bresolution\s*no\.",
+#             r"memorandum of agreement",
+#             r"effectivity",
+#         ],
+#         "Research": [
+#             r"terminal report",
+#             r"narrative report"
+#         ]
+#     }
+
+#     PRIORITY_ORDER = [
+#         "Policies",
+#         "Official Issuances",
+#         "Research",
+#         "Academics",
+#         "Administrative",
+#         "News & Events"
+#     ]
+
+#     # -------------------------------
+#     # 0. 🔥 HARD RULES (TOP PRIORITY)
+#     # -------------------------------
+
+#     # ✅ 1. MANUAL DETECTION (HIGHEST PRIORITY)
+#     if "manual" in text:
+#         return "Policies"
+
+#     # ✅ 2. STRICT OFFICIAL ISSUANCE DETECTION
+#     if re.search(r"(special order|office special order|so no\.?\s*\d+)", text):
+#         return "Official Issuances"
+
+#     if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", text):
+#         return "Official Issuances"
+
+#     # -------------------------------
+#     # 1. KEYWORD SCORING
+#     # -------------------------------
+#     for category, words in CATEGORY_KEYWORDS.items():
+#         for w in words:
+#             if w in text:
+#                 scores[category] += 2
+
+#     # -------------------------------
+#     # 2. STRONG PATTERN MATCHING
+#     # -------------------------------
+#     for category, patterns in STRONG_PATTERNS.items():
+#         for pattern in patterns:
+#             if re.search(pattern, text):
+#                 scores[category] += 15
+
+#     # -------------------------------
+#     # 3. STRUCTURAL SIGNALS
+#     # -------------------------------
+#     if "manual" in text:
+#         scores["Policies"] += 25
+
+#     if "prescribing" in text:
+#         scores["Policies"] += 20
+
+#     if "effectivity" in text:
+#         scores["Official Issuances"] += 10
+
+#     if "abstract" in text and "research" in text:
+#         scores["Research"] += 10
+
+#     # -------------------------------
+#     # 4. SAFE NER SIGNALS
+#     # -------------------------------
+#     for ent in doc.ents:
+#         if ent.label_ == "DATE":
+#             scores["Official Issuances"] += 1
+
+#     # -------------------------------
+#     # 5. POLICY OVERRIDE
+#     # -------------------------------
+#     if (
+#         scores["Policies"] >= 30
+#         and (
+#             "policy" in text
+#             or "guidelines" in text
+#             or "procedures" in text
+#             or "prescribing" in text
+#         )
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 6. CLEAN ADMIN NOISE
+#     # -------------------------------
+#     if scores["Administrative"] < 5:
+#         scores["Administrative"] = 0
+
+#     # -------------------------------
+#     # 7. FINAL DECISION
+#     # -------------------------------
+#     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     top_score = sorted_scores[0][1]
+
+#     if top_score < 3:
+#         return "General"
+
+#     top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
+
+#     for category in PRIORITY_ORDER:
+#         if category in top_candidates:
+#             return category
+
+#     return sorted_scores[0][0]
+
+# import spacy
+# import re
+
+# nlp = spacy.load("en_core_web_sm")
+
+
+# def classify_document(text: str):
+#     if not text or len(text.strip()) < 50:
+#         return "General"
+
+#     text = text.lower()
+#     doc = nlp(text)
+
+#     # -------------------------------
+#     # CATEGORY DEFINITIONS
+#     # -------------------------------
+#     scores = {
+#         "Administrative": 0,
+#         "Academics": 0,
+#         "Research": 0,
+#         "Policies": 0,
+#         "Official Issuances": 0,
+#         "News & Events": 0,
+#     }
+
+#     CATEGORY_KEYWORDS = {
+#         "Administrative": [
+#             "office", "administrative", "committee", "meeting",
+#             "attendance", "secretariat", "endorsement",
+#             "form", "certification", "certify", "annex", "signature"
+#         ],
+#         "Academics": [
+#             "student", "faculty", "curriculum", "course",
+#             "syllabus", "lecture", "midterm", "finals"
+#         ],
+#         "Research": [
+#             "research", "study", "methodology", "abstract",
+#             "publication", "innovation", "terminal report"
+#         ],
+#         "Policies": [
+#             "policy", "policies", "guidelines", "procedures",
+#             "provision", "manual", "compliance"
+#         ],
+#         "Official Issuances": [
+#             "memorandum", "circular", "resolution",
+#             "special order", "directive", "moa", "agreement"
+#         ],
+#         "News & Events": [
+#             "event", "activity", "workshop", "celebration"
+#         ]
+#     }
+
+#     STRONG_PATTERNS = {
+#         "Policies": [
+#             r"policies,\s*guidelines\s*and\s*procedures",
+#             r"accounting manual",
+#             r"repealing clause",
+#         ],
+#         "Official Issuances": [
+#             r"\bcircular\s*no\.",
+#             r"\bmemorandum\s*no\.",
+#             r"\bresolution\s*no\.",
+#             r"memorandum of agreement",
+#             r"effectivity",
+#         ],
+#         "Research": [
+#             r"terminal report",
+#             r"narrative report"
+#         ]
+#     }
+
+#     PRIORITY_ORDER = [
+#         "Policies",
+#         "Official Issuances",
+#         "Research",
+#         "Academics",
+#         "Administrative",
+#         "News & Events"
+#     ]
+
+#     # -------------------------------
+#     # 0. 🔥 HARD RULES (TOP PRIORITY)
+#     # -------------------------------
+
+#     # ✅ 1. MANUAL DETECTION
+#     if "manual" in text:
+#         return "Policies"
+
+#     # ✅ 2. OFFICIAL ISSUANCES
+#     if re.search(r"(special order|office special order|so no\.?\s*\d+)", text):
+#         return "Official Issuances"
+
+#     if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", text):
+#         return "Official Issuances"
+
+#     # ✅ 3. FORM / CERTIFICATION (NEW FIX)
+#     if re.search(r"(certification form|annex\s*[a-z]|do hereby certify|signature)", text):
+#         return "Administrative"
+
+#     # -------------------------------
+#     # 1. KEYWORD SCORING
+#     # -------------------------------
+#     for category, words in CATEGORY_KEYWORDS.items():
+#         for w in words:
+#             if w in text:
+#                 scores[category] += 2
+
+#     # -------------------------------
+#     # 2. STRONG PATTERN MATCHING
+#     # -------------------------------
+#     for category, patterns in STRONG_PATTERNS.items():
+#         for pattern in patterns:
+#             if re.search(pattern, text):
+#                 scores[category] += 15
+
+#     # -------------------------------
+#     # 3. STRUCTURAL SIGNALS
+#     # -------------------------------
+#     if "manual" in text:
+#         scores["Policies"] += 25
+
+#     if "prescribing" in text:
+#         scores["Policies"] += 20
+
+#     if "effectivity" in text:
+#         scores["Official Issuances"] += 10
+
+#     if "abstract" in text and "research" in text:
+#         scores["Research"] += 10
+
+#     # -------------------------------
+#     # 4. SAFE NER SIGNALS
+#     # -------------------------------
+#     for ent in doc.ents:
+#         if ent.label_ == "DATE":
+#             scores["Official Issuances"] += 1
+
+#     # -------------------------------
+#     # 5. POLICY OVERRIDE
+#     # -------------------------------
+#     if (
+#         scores["Policies"] >= 30
+#         and (
+#             "policy" in text
+#             or "guidelines" in text
+#             or "procedures" in text
+#             or "prescribing" in text
+#         )
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 6. CLEAN ADMIN NOISE
+#     # -------------------------------
+#     if scores["Administrative"] < 5:
+#         scores["Administrative"] = 0
+
+#     # -------------------------------
+#     # 7. FINAL DECISION
+#     # -------------------------------
+#     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     top_score = sorted_scores[0][1]
+
+#     if top_score < 3:
+#         return "General"
+
+#     top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
+
+#     for category in PRIORITY_ORDER:
+#         if category in top_candidates:
+#             return category
+
+#     return sorted_scores[0][0]
+
+
+# import spacy
+# import re
+
+# nlp = spacy.load("en_core_web_sm")
+
+
+# def classify_document(text: str):
+#     if not text or len(text.strip()) < 50:
+#         return "General"
+
+#     text = text.lower()
+#     doc = nlp(text)
+
+#     # -------------------------------
+#     # CATEGORY DEFINITIONS
+#     # -------------------------------
+#     scores = {
+#         "Administrative": 0,
+#         "Academics": 0,
+#         "Research": 0,
+#         "Policies": 0,
+#         "Official Issuances": 0,
+#         "News & Events": 0,
+#     }
+
+#     CATEGORY_KEYWORDS = {
+#         "Administrative": [
+#             "office", "administrative", "committee", "meeting",
+#             "attendance", "secretariat", "endorsement",
+#             "form", "certification", "certify", "annex", "signature"
+#         ],
+#         "Academics": [
+#             "student", "faculty", "curriculum", "course",
+#             "syllabus", "lecture", "midterm", "finals"
+#         ],
+#         "Research": [
+#             "research", "study", "methodology", "abstract",
+#             "publication", "innovation", "terminal report"
+#         ],
+#         "Policies": [
+#             "policy", "policies", "guidelines", "procedures",
+#             "provision", "manual", "compliance"
+#         ],
+#         "Official Issuances": [
+#             "memorandum", "circular", "resolution",
+#             "special order", "directive", "moa", "agreement"
+#         ],
+#         "News & Events": [
+#             "event", "activity", "workshop", "seminar", "training", "orientation"
+#         ]
+#     }
+
+#     STRONG_PATTERNS = {
+#         "Policies": [
+#             r"policies,\s*guidelines\s*and\s*procedures",
+#             r"accounting manual",
+#             r"repealing clause",
+#         ],
+#         "Official Issuances": [
+#             r"\bcircular\s*no\.",
+#             r"\bmemorandum\s*no\.",
+#             r"\bresolution\s*no\.",
+#             r"memorandum of agreement",
+#             r"effectivity",
+#         ],
+#         "Research": [
+#             r"terminal report",
+#             r"narrative report"
+#         ]
+#     }
+
+#     PRIORITY_ORDER = [
+#         "Policies",
+#         "Official Issuances",
+#         "Research",
+#         "Academics",
+#         "Administrative",
+#         "News & Events"
+#     ]
+
+#     # -------------------------------
+#     # 0. 🔥 HARD RULES (TOP PRIORITY)
+#     # -------------------------------
+
+#     # ✅ 1. MANUAL DETECTION
+#     if "manual" in text:
+#         return "Policies"
+
+#     # ✅ 2. OFFICIAL ISSUANCES
+#     if re.search(r"(special order|office special order|so no\.?\s*\d+)", text):
+#         return "Official Issuances"
+
+#     if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", text):
+#         return "Official Issuances"
+
+#     # ✅ 3. FORM / CERTIFICATION
+#     if re.search(r"(certification form|annex\s*[a-z]|do hereby certify|signature)", text):
+#         return "Administrative"
+
+#     # ✅ 4. EVENT / WORKSHOP DETECTION (NEW FIX)
+#     if re.search(r"(workshop|orientation|seminar|training|conference)", text):
+#         return "News & Events"
+
+#     # -------------------------------
+#     # 1. KEYWORD SCORING
+#     # -------------------------------
+#     for category, words in CATEGORY_KEYWORDS.items():
+#         for w in words:
+#             if w in text:
+#                 scores[category] += 2
+
+#     # -------------------------------
+#     # 2. STRONG PATTERN MATCHING
+#     # -------------------------------
+#     for category, patterns in STRONG_PATTERNS.items():
+#         for pattern in patterns:
+#             if re.search(pattern, text):
+#                 scores[category] += 15
+
+#     # -------------------------------
+#     # 3. STRUCTURAL SIGNALS
+#     # -------------------------------
+#     if "manual" in text:
+#         scores["Policies"] += 25
+
+#     if "prescribing" in text:
+#         scores["Policies"] += 20
+
+#     if "effectivity" in text:
+#         scores["Official Issuances"] += 10
+
+#     if "abstract" in text and "research" in text:
+#         scores["Research"] += 10
+
+#     # -------------------------------
+#     # 4. SAFE NER SIGNALS
+#     # -------------------------------
+#     for ent in doc.ents:
+#         if ent.label_ == "DATE":
+#             scores["Official Issuances"] += 1
+
+#     # -------------------------------
+#     # 5. POLICY OVERRIDE
+#     # -------------------------------
+#     if (
+#         scores["Policies"] >= 30
+#         and (
+#             "policy" in text
+#             or "guidelines" in text
+#             or "procedures" in text
+#             or "prescribing" in text
+#         )
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 6. CLEAN ADMIN NOISE
+#     # -------------------------------
+#     if scores["Administrative"] < 5:
+#         scores["Administrative"] = 0
+
+#     # -------------------------------
+#     # 7. FINAL DECISION
+#     # -------------------------------
+#     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     top_score = sorted_scores[0][1]
+
+#     if top_score < 3:
+#         return "General"
+
+#     top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
+
+#     for category in PRIORITY_ORDER:
+#         if category in top_candidates:
+#             return category
+
+#     return sorted_scores[0][0]
+
+# import spacy
+# import re
+
+# nlp = spacy.load("en_core_web_sm")
+
+
+# def classify_document(text: str):
+#     if not text or len(text.strip()) < 50:
+#         return "General"
+
+#     text = text.lower()
+#     doc = nlp(text)
+
+#     # -------------------------------
+#     # CATEGORY DEFINITIONS
+#     # -------------------------------
+#     scores = {
+#         "Administrative": 0,
+#         "Academics": 0,
+#         "Research": 0,
+#         "Policies": 0,
+#         "Official Issuances": 0,
+#         "News & Events": 0,
+#     }
+
+#     CATEGORY_KEYWORDS = {
+#         "Administrative": [
+#             "office", "administrative", "committee", "meeting",
+#             "attendance", "secretariat", "endorsement",
+#             "form", "certification", "certify", "annex", "signature"
+#         ],
+#         "Academics": [
+#             "student", "faculty", "curriculum", "course",
+#             "syllabus", "lecture", "midterm", "finals"
+#         ],
+#         "Research": [
+#             "research", "study", "methodology", "abstract",
+#             "publication", "innovation", "terminal report"
+#         ],
+#         "Policies": [
+#             "policy", "policies", "guidelines", "procedures",
+#             "provision", "manual", "compliance"
+#         ],
+#         "Official Issuances": [
+#             "memorandum", "circular", "resolution",
+#             "special order", "directive", "moa", "agreement"
+#         ],
+#         "News & Events": [
+#             "event", "activity", "workshop", "seminar", "training", "orientation", "conference"
+#         ]
+#     }
+
+#     STRONG_PATTERNS = {
+#         "Policies": [
+#             r"policies,\s*guidelines\s*and\s*procedures",
+#             r"accounting manual",
+#             r"repealing clause",
+#         ],
+#         "Official Issuances": [
+#             r"\bcircular\s*no\.",
+#             r"\bmemorandum\s*no\.",
+#             r"\bresolution\s*no\.",
+#             r"memorandum of agreement",
+#             r"effectivity",
+#         ],
+#         "Research": [
+#             r"terminal report",
+#             r"narrative report"
+#         ]
+#     }
+
+#     PRIORITY_ORDER = [
+#         "Policies",
+#         "Official Issuances",
+#         "Research",
+#         "Academics",
+#         "Administrative",
+#         "News & Events"
+#     ]
+
+#     # -------------------------------
+#     # 0. 🔥 HARD RULES (TOP PRIORITY)
+#     # -------------------------------
+
+#     # ✅ 1. MANUAL DETECTION
+#     if "manual" in text:
+#         return "Policies"
+
+#     # ✅ 2. EVENT DETECTION (FIXED PRIORITY)
+#     if re.search(r"(orientation workshop|workshop|seminar|training|conference)", text):
+#         return "News & Events"
+
+#     # ✅ 3. OFFICIAL ISSUANCES
+#     if re.search(r"(special order|office special order|so no\.?\s*\d+)", text):
+#         return "Official Issuances"
+
+#     if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", text):
+#         return "Official Issuances"
+
+#     # ✅ 4. FORM / CERTIFICATION
+#     if re.search(r"(certification form|annex\s*[a-z]|do hereby certify|signature)", text):
+#         return "Administrative"
+
+#     # -------------------------------
+#     # 1. KEYWORD SCORING
+#     # -------------------------------
+#     for category, words in CATEGORY_KEYWORDS.items():
+#         for w in words:
+#             if w in text:
+#                 scores[category] += 2
+
+#     # -------------------------------
+#     # 2. STRONG PATTERN MATCHING
+#     # -------------------------------
+#     for category, patterns in STRONG_PATTERNS.items():
+#         for pattern in patterns:
+#             if re.search(pattern, text):
+#                 scores[category] += 15
+
+#     # -------------------------------
+#     # 3. STRUCTURAL SIGNALS
+#     # -------------------------------
+#     if "manual" in text:
+#         scores["Policies"] += 25
+
+#     if "prescribing" in text:
+#         scores["Policies"] += 20
+
+#     if "effectivity" in text:
+#         scores["Official Issuances"] += 10
+
+#     if "abstract" in text and "research" in text:
+#         scores["Research"] += 10
+
+#     # -------------------------------
+#     # 4. SAFE NER SIGNALS
+#     # -------------------------------
+#     for ent in doc.ents:
+#         if ent.label_ == "DATE":
+#             scores["Official Issuances"] += 1
+
+#     # -------------------------------
+#     # 5. POLICY OVERRIDE (PROTECTED)
+#     # -------------------------------
+#     if (
+#         scores["Policies"] >= 30
+#         and not re.search(r"(workshop|orientation|seminar|training|conference)", text)
+#         and (
+#             "policy" in text
+#             or "guidelines" in text
+#             or "procedures" in text
+#             or "prescribing" in text
+#         )
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 6. CLEAN ADMIN NOISE
+#     # -------------------------------
+#     if scores["Administrative"] < 5:
+#         scores["Administrative"] = 0
+
+#     # -------------------------------
+#     # 7. FINAL DECISION
+#     # -------------------------------
+#     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     top_score = sorted_scores[0][1]
+
+#     if top_score < 3:
+#         return "General"
+
+#     top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
+
+#     for category in PRIORITY_ORDER:
+#         if category in top_candidates:
+#             return category
+
+#     return sorted_scores[0][0]
+
+# import spacy
+# import re
+
+# nlp = spacy.load("en_core_web_sm")
+
+
+# def classify_document(text: str):
+#     if not text or len(text.strip()) < 50:
+#         return "General"
+
+#     text = text.lower()
+#     doc = nlp(text)
+
+#     # -------------------------------
+#     # CATEGORY DEFINITIONS
+#     # -------------------------------
+#     scores = {
+#         "Administrative": 0,
+#         "Academics": 0,
+#         "Research": 0,
+#         "Policies": 0,
+#         "Official Issuances": 0,
+#         "News & Events": 0,
+#     }
+
+#     CATEGORY_KEYWORDS = {
+#         "Administrative": [
+#             "office", "administrative", "committee", "meeting",
+#             "attendance", "secretariat", "endorsement",
+#             "form", "certification", "certify", "annex", "signature",
+#             "evaluation", "rating", "score", "criteria", "bidder"
+#         ],
+#         "Academics": [
+#             "student", "faculty", "curriculum", "course",
+#             "syllabus", "lecture", "midterm", "finals"
+#         ],
+#         "Research": [
+#             "research", "study", "methodology", "abstract",
+#             "publication", "innovation", "terminal report"
+#         ],
+#         "Policies": [
+#             "policy", "policies", "guidelines", "procedures",
+#             "provision", "manual", "compliance"
+#         ],
+#         "Official Issuances": [
+#             "memorandum", "circular", "resolution",
+#             "special order", "directive", "moa", "agreement"
+#         ],
+#         "News & Events": [
+#             "event", "activity", "workshop", "seminar", "training", "orientation", "conference"
+#         ]
+#     }
+
+#     STRONG_PATTERNS = {
+#         "Policies": [
+#             r"policies,\s*guidelines\s*and\s*procedures",
+#             r"accounting manual",
+#             r"repealing clause",
+#         ],
+#         "Official Issuances": [
+#             r"\bcircular\s*no\.",
+#             r"\bmemorandum\s*no\.",
+#             r"\bresolution\s*no\.",
+#             r"memorandum of agreement",
+#             r"effectivity",
+#         ],
+#         "Research": [
+#             r"terminal report",
+#             r"narrative report"
+#         ]
+#     }
+
+#     PRIORITY_ORDER = [
+#         "Policies",
+#         "Official Issuances",
+#         "Research",
+#         "Academics",
+#         "Administrative",
+#         "News & Events"
+#     ]
+
+#     # -------------------------------
+#     # 0. 🔥 HARD RULES (TOP PRIORITY)
+#     # -------------------------------
+
+#     # ✅ 1. MANUAL DETECTION
+#     if "manual" in text:
+#         return "Policies"
+
+#     # ✅ 2. EVENT DETECTION
+#     if re.search(r"(orientation workshop|workshop|seminar|training|conference)", text):
+#         return "News & Events"
+
+#     # ✅ 3. OFFICIAL ISSUANCES
+#     if re.search(r"(special order|office special order|so no\.?\s*\d+)", text):
+#         return "Official Issuances"
+
+#     if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", text):
+#         return "Official Issuances"
+
+#     # ✅ 4. FORM / CERTIFICATION
+#     if re.search(r"(certification form|annex\s*[a-z]|do hereby certify|signature)", text):
+#         return "Administrative"
+
+#     # ✅ 5. EVALUATION / RATING (🔥 NEW FIX)
+#     if re.search(r"(evaluation|rating|score|criteria|final rating|bidder)", text):
+#         return "Administrative"
+
+#     # -------------------------------
+#     # 1. KEYWORD SCORING
+#     # -------------------------------
+#     for category, words in CATEGORY_KEYWORDS.items():
+#         for w in words:
+#             if w in text:
+#                 scores[category] += 2
+
+#     # -------------------------------
+#     # 2. STRONG PATTERN MATCHING
+#     # -------------------------------
+#     for category, patterns in STRONG_PATTERNS.items():
+#         for pattern in patterns:
+#             if re.search(pattern, text):
+#                 scores[category] += 15
+
+#     # -------------------------------
+#     # 3. STRUCTURAL SIGNALS
+#     # -------------------------------
+#     if "manual" in text:
+#         scores["Policies"] += 25
+
+#     if "prescribing" in text:
+#         scores["Policies"] += 20
+
+#     if "effectivity" in text:
+#         scores["Official Issuances"] += 10
+
+#     if "abstract" in text and "research" in text:
+#         scores["Research"] += 10
+
+#     # -------------------------------
+#     # 4. SAFE NER SIGNALS
+#     # -------------------------------
+#     for ent in doc.ents:
+#         if ent.label_ == "DATE":
+#             scores["Official Issuances"] += 1
+
+#     # -------------------------------
+#     # 5. POLICY OVERRIDE (PROTECTED)
+#     # -------------------------------
+#     if (
+#         scores["Policies"] >= 30
+#         and not re.search(r"(workshop|orientation|seminar|training|conference)", text)
+#         and (
+#             "policy" in text
+#             or "guidelines" in text
+#             or "procedures" in text
+#             or "prescribing" in text
+#         )
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 6. CLEAN ADMIN NOISE
+#     # -------------------------------
+#     if scores["Administrative"] < 5:
+#         scores["Administrative"] = 0
+
+#     # -------------------------------
+#     # 7. FINAL DECISION
+#     # -------------------------------
+#     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     top_score = sorted_scores[0][1]
+
+#     if top_score < 3:
+#         return "General"
+
+#     top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
+
+#     for category in PRIORITY_ORDER:
+#         if category in top_candidates:
+#             return category
+
+#     return sorted_scores[0][0]
+
+
+# import spacy
+# import re
+
+# nlp = spacy.load("en_core_web_sm")
+
+
+# def classify_document(text: str):
+#     if not text or len(text.strip()) < 50:
+#         return "General"
+
+#     text = text.lower()
+#     doc = nlp(text)
+
+#     # -------------------------------
+#     # CATEGORY DEFINITIONS
+#     # -------------------------------
+#     scores = {
+#         "Administrative": 0,
+#         "Academics": 0,
+#         "Research": 0,
+#         "Policies": 0,
+#         "Official Issuances": 0,
+#         "News & Events": 0,
+#     }
+
+#     CATEGORY_KEYWORDS = {
+#         "Administrative": [
+#             "office", "administrative", "committee", "meeting",
+#             "attendance", "secretariat", "endorsement",
+#             "form", "certification", "certify", "annex", "signature",
+#             "evaluation", "rating", "score", "criteria", "bidder"
+#         ],
+#         "Academics": [
+#             "student", "faculty", "curriculum", "course",
+#             "syllabus", "lecture", "midterm", "finals"
+#         ],
+#         "Research": [
+#             "research", "study", "methodology", "abstract",
+#             "publication", "innovation", "terminal report"
+#         ],
+#         "Policies": [
+#             "policy", "policies", "guidelines", "procedures",
+#             "provision", "manual", "compliance"
+#         ],
+#         "Official Issuances": [
+#             "memorandum", "circular", "resolution",
+#             "special order", "directive", "moa", "agreement"
+#         ],
+#         "News & Events": [
+#             "event", "activity", "workshop", "seminar",
+#             "training", "orientation", "conference"
+#         ]
+#     }
+
+#     STRONG_PATTERNS = {
+#         "Policies": [
+#             r"policies,\s*guidelines\s*and\s*procedures",
+#             r"accounting manual",
+#             r"repealing clause",
+#         ],
+#         "Official Issuances": [
+#             r"\bcircular\s*no\.",
+#             r"\bmemorandum\s*no\.",
+#             r"\bresolution\s*no\.",
+#             r"memorandum of agreement",
+#             r"effectivity",
+#         ],
+#         "Research": [
+#             r"terminal report",
+#             r"narrative report"
+#         ]
+#     }
+
+#     PRIORITY_ORDER = [
+#         "Policies",
+#         "Official Issuances",
+#         "Research",
+#         "Academics",
+#         "Administrative",
+#         "News & Events"
+#     ]
+
+#     # -------------------------------
+#     # 0. 🔥 HARD RULES (TOP PRIORITY)
+#     # -------------------------------
+
+#     # ✅ 1. MANUAL DETECTION
+#     if "manual" in text:
+#         return "Policies"
+
+#     # ✅ 2. EVENT DETECTION (FIXED - CONTEXT AWARE)
+#     if (
+#         re.search(r"(orientation workshop|workshop on|seminar on|training on|conference on)", text)
+#         and re.search(r"(date|venue|time|schedule)", text)
+#     ):
+#         return "News & Events"
+
+#     # # ✅ 3. OFFICIAL ISSUANCES
+#     # if re.search(r"(special order|office special order|so no\.?\s*\d+)", text):
+#     #     return "Official Issuances"
+    
+#     # ✅ 3. OFFICIAL ISSUANCES (FIXED - HEADER ONLY)
+#     header = text[:300]
+
+#     if re.search(r"(special order|office special order|so no\.?\s*\d+)", header):
+#         return "Official Issuances"
+
+#     if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", header):
+#         return "Official Issuances"
+
+#     if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", text):
+#         return "Official Issuances"
+
+#     # ✅ 4. FORM / CERTIFICATION
+#     if re.search(r"(certification form|annex\s*[a-z]|do hereby certify|signature)", text):
+#         return "Administrative"
+
+#     # ✅ 5. EVALUATION / RATING
+#     if re.search(r"(evaluation|rating|score|criteria|final rating|bidder)", text):
+#         return "Administrative"
+
+#     # -------------------------------
+#     # 1. KEYWORD SCORING
+#     # -------------------------------
+#     for category, words in CATEGORY_KEYWORDS.items():
+#         for w in words:
+#             if w in text:
+#                 scores[category] += 2
+
+#     # -------------------------------
+#     # 2. STRONG PATTERN MATCHING
+#     # -------------------------------
+#     for category, patterns in STRONG_PATTERNS.items():
+#         for pattern in patterns:
+#             if re.search(pattern, text):
+#                 scores[category] += 15
+
+#     # -------------------------------
+#     # 3. STRUCTURAL SIGNALS
+#     # -------------------------------
+#     if "manual" in text:
+#         scores["Policies"] += 25
+
+#     if "prescribing" in text:
+#         scores["Policies"] += 20
+
+#     if "effectivity" in text:
+#         scores["Official Issuances"] += 10
+
+#     if "abstract" in text and "research" in text:
+#         scores["Research"] += 10
+
+#     # -------------------------------
+#     # 4. SAFE NER SIGNALS
+#     # -------------------------------
+#     for ent in doc.ents:
+#         if ent.label_ == "DATE":
+#             scores["Official Issuances"] += 1
+
+#     # -------------------------------
+#     # 5. POLICY OVERRIDE (PROTECTED)
+#     # -------------------------------
+#     if (
+#         scores["Policies"] >= 30
+#         and not re.search(r"(workshop|orientation|seminar|training|conference)", text)
+#         and (
+#             "policy" in text
+#             or "guidelines" in text
+#             or "procedures" in text
+#             or "prescribing" in text
+#         )
+#     ):
+#         return "Policies"
+
+#     # -------------------------------
+#     # 6. CLEAN ADMIN NOISE
+#     # -------------------------------
+#     if scores["Administrative"] < 5:
+#         scores["Administrative"] = 0
+
+#     # -------------------------------
+#     # 7. FINAL DECISION
+#     # -------------------------------
+#     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     top_score = sorted_scores[0][1]
+
+#     if top_score < 3:
+#         return "General"
+
+#     top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
+
+#     for category in PRIORITY_ORDER:
+#         if category in top_candidates:
+#             return category
+
+#     return sorted_scores[0][0]
+
+
 import spacy
+import re
+
 nlp = spacy.load("en_core_web_sm")
 
-def classify_document(text: str):
-    text = text.lower()
 
-    categories = {
+# -------------------------------
+# 🧠 TITLE EXTRACTION
+# -------------------------------
+# def extract_title(text: str):
+#     lines = text.split("\n")
+#     lines = [l.strip() for l in lines if l.strip()]
+
+#     for line in lines[:10]:
+#         if len(line) < 5:
+#             continue
+#         if line.isupper() or len(line.split()) <= 15:
+#             return line.lower()
+
+#     return lines[0].lower() if lines else ""
+
+def extract_title(text: str):
+    lines = text.split("\n")
+    lines = [l.strip() for l in lines if l.strip()]
+
+    TITLE_KEYWORDS = [
+        "plan", "manual", "report", "guidelines",
+        "policy", "framework", "proposal",
+        "continuity", "implementation"
+    ]
+
+    for line in lines[:15]:  # expand scan range
+        clean_line = line.lower()
+
+        # ❌ Skip organization names
+        if re.search(r"(college|university|department|office)", clean_line):
+            continue
+
+        # ✅ Prefer meaningful titles
+        if any(k in clean_line for k in TITLE_KEYWORDS):
+            return clean_line
+
+        # fallback candidate
+        if 5 < len(clean_line.split()) <= 15:
+            return clean_line
+
+    return lines[0].lower() if lines else ""
+
+
+def classify_document(text: str):
+    if not text or len(text.strip()) < 50:
+        return "General"
+
+    text = text.lower()
+    doc = nlp(text)
+
+    # 🔥 Extract title
+    title = extract_title(text)
+
+    # -------------------------------
+    # CATEGORY DEFINITIONS
+    # -------------------------------
+    scores = {
         "Administrative": 0,
         "Academics": 0,
         "Research": 0,
         "Policies": 0,
-        "Official Issuances": 0,   # MERGED CATEGORY
+        "Official Issuances": 0,
         "News & Events": 0,
     }
 
-#MANUAL EDIT: Added "Manual" as a custom policy keyword
-    # policy_patterns = [
-    #     {"label": "LAW", "pattern": "GDPR"},
-    #     {"label": "LAW", "pattern": "HIPAA"},
-    #     {"label": "LAW", "pattern": "privacy policy"},
-    #     {"label": "CUSTOM_POLICY_KEYWORD", "pattern": "Manual"} # <-- Added "Manual" here
-    # ]
-    # entity_ruler = nlp.add_pipe("entity_ruler", before="ner", config={"overwrite_ents": True})
-    # entity_ruler.add_patterns(policy_patterns)
-
-
-
-    research_patterns = [
-    {"label": "RESEARCH_TERM", "pattern": "terminal report"},
-    {"label": "RESEARCH_TERM", "pattern": "clinical trial"},
-    {"label": "RESEARCH_TERM", "pattern": "peer review"},
-    {"label": "RESEARCH_TERM", "pattern": "methodology section"},
-    {"label": "RESEARCH_TERM", "pattern": "research paper"}
-    ]
-    doc = nlp(text)
-
-    # --- NER SIGNALS ---
-    for ent in doc.ents:
-        if ent.label_ in ["ORG", "PERSON"]:
-            categories["Administrative"] += 1
-
-        if ent.label_ == "DATE":
-            categories["Official Issuances"] += 1
-
-        if ent.label_ in ["LAW", "CUSTOM_POLICY_KEYWORD"]:
-            categories["Policies"] += 20
-
-        if ent.label_ == "EVENT":
-            categories["News & Events"] += 2
-        
-        if ent.label_ == "RESEARCH_TERM":
-            categories["Research"] += 20
-
-    # --- KEYWORDS FOR EACH CATEGORY ---
-    keywords = {
+    CATEGORY_KEYWORDS = {
         "Administrative": [
-            "office", "admin", "administrative", "committee", "meeting",
-            "secretariat", "endorsement", "attendance", "subject"
+            "office", "administrative", "committee", "meeting",
+            "attendance", "secretariat", "endorsement",
+            "form", "certification", "certify", "annex", "signature",
+            "evaluation", "rating", "score", "criteria", "bidder"
         ],
         "Academics": [
-            "academic", "faculty", "student", "class", "course", "curriculum",
-            "syllabus", "lecture", "load", "midterm", "finals"
+            "student", "faculty", "curriculum", "course",
+            "syllabus", "lecture", "midterm", "finals"
         ],
         "Research": [
-            "research", "study", "rde", "proposal", "ethics", "manuscript",
-            "publication", "extension", "innovation", "narrative report", "terminal report", "extension"
+            "research", "study", "methodology", "abstract",
+            "publication", "innovation", "terminal report"
         ],
         "Policies": [
-            "policy", "guidelines", "procedures", "compliance", "section",
-            "article", "provision", "manual", "repealing clauOffse", "effectivity"
+            "policy", "policies", "guidelines", "procedures",
+            "provision", "manual", "compliance"
         ],
-
-        # MERGED CATEGORY
         "Official Issuances": [
-            # Memos/SOs keywords
-            "memo", "memorandum", "special order", "directive", "instruction",
-            # Resolution keywords
-            "resolution", "endorsed", "recommendation", "approved", "council", "board",
-            # MOA keywords
-            "memorandum of agreement", "moa", "agreement", "parties",
-            "obligations", "responsibilities", "deliverables", "terms and conditions",
-            "scope of work", "duration", "effectivity", "signatories"
+            "memorandum", "circular", "resolution",
+            "special order", "directive", "moa", "agreement"
         ],
-
         "News & Events": [
-            "event", "activity", "program", "launching", "workshop",
-            "celebration", "highlights", "gallery"
-        ],
+            "event", "activity", "workshop", "seminar",
+            "training", "orientation", "conference"
+        ]
     }
 
-    # --- KEYWORD SCORING ---
-    for category, words in keywords.items():
+    STRONG_PATTERNS = {
+        "Policies": [
+            r"policies,\s*guidelines\s*and\s*procedures",
+            r"accounting manual",
+            r"repealing clause",
+        ],
+        "Official Issuances": [
+            r"\bcircular\s*no\.",
+            r"\bmemorandum\s*no\.",
+            r"\bresolution\s*no\.",
+            r"memorandum of agreement",
+            r"effectivity",
+        ],
+        "Research": [
+            r"terminal report",
+            r"narrative report"
+        ]
+    }
+
+    PRIORITY_ORDER = [
+        "Policies",
+        "Official Issuances",
+        "Research",
+        "Academics",
+        "Administrative",
+        "News & Events"
+    ]
+
+    # -------------------------------
+    # 🔥 0. TITLE-BASED INTENT DETECTION
+    # -------------------------------
+
+    if "manual" in title:
+        return "Policies"
+
+    if re.search(r"(plan|framework|guidelines|policy)", title):
+        return "Policies"
+
+    if re.search(r"(workshop|seminar|training|conference|orientation)", title):
+        return "News & Events"
+
+    if re.search(r"(memorandum|circular|resolution|special order)", title):
+        return "Official Issuances"
+
+    if re.search(r"(form|certification)", title):
+        return "Administrative"
+
+    if re.search(r"(evaluation|rating|score)", title):
+        return "Administrative"
+
+    # -------------------------------
+    # 🔥 1. HARD RULES
+    # -------------------------------
+
+    if "manual" in text:
+        return "Policies"
+
+    # Event (context-aware)
+    if (
+        re.search(r"(orientation workshop|workshop on|seminar on|training on|conference on)", text)
+        and re.search(r"(date|venue|time|schedule)", text)
+    ):
+        return "News & Events"
+
+    # Issuances (HEADER ONLY)
+    header = text[:300]
+
+    if re.search(r"(special order|office special order|so no\.?\s*\d+)", header):
+        return "Official Issuances"
+
+    if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", header):
+        return "Official Issuances"
+
+    # Form
+    if re.search(r"(certification form|annex\s*[a-z]|do hereby certify|signature)", text):
+        return "Administrative"
+
+    # Evaluation
+    if re.search(r"(evaluation|rating|score|criteria|final rating|bidder)", text):
+        return "Administrative"
+
+    # -------------------------------
+    # 2. KEYWORD SCORING
+    # -------------------------------
+    for category, words in CATEGORY_KEYWORDS.items():
         for w in words:
             if w in text:
-                categories[category] += 2
+                scores[category] += 2
 
-    # --- STRUCTURAL SIGNALS (VERY IMPORTANT) ---
+    # -------------------------------
+    # 3. STRONG PATTERN MATCHING
+    # -------------------------------
+    for category, patterns in STRONG_PATTERNS.items():
+        for pattern in patterns:
+            if re.search(pattern, text):
+                scores[category] += 15
 
-    # Old: "Resolution"
-    if "resolution no" in text:
-        categories["Official Issuances"] += 12
-
-    # Old: "Memo / SO"
-    if "special order" in text or "so no" in text:
-        categories["Official Issuances"] += 10
-
-    if "memorandum" in text:
-        categories["Official Issuances"] += 8
-
-    # Old: "MOA"
-    if "memorandum of agreement" in text:
-        categories["Official Issuances"] += 12
-
-    if "this agreement" in text and "parties" in text:
-        categories["Official Issuances"] += 8
-
-    if "terms and conditions" in text:
-        categories["Official Issuances"] += 5
-
-    if "obligations of the parties" in text:
-        categories["Official Issuances"] += 10
-
-    # Other category structural boosts
-    if "faculty" in text and "load" in text:
-        categories["Academics"] += 7
-
-    if "research" in text and "abstract" in text:
-        categories["Research"] += 5
-
-    if "narrative report" in text:
-        categories["Research"] += 30
-
-    if "terminal report" in text:
-        categories["Research"] += 30
-
-    if "event" in text or "activity" in text:
-        categories["News & Events"] += 5
-    
+    # -------------------------------
+    # 4. STRUCTURAL SIGNALS
+    # -------------------------------
     if "manual" in text:
-        categories["Policies"] += 15
-    
-    if "repealing clause" in text:
-        categories["Policies"] += 15
+        scores["Policies"] += 25
 
-    # --- WINNER ---
-    best_category = max(categories, key=categories.get)
+    if "prescribing" in text:
+        scores["Policies"] += 20
 
-    if categories[best_category] < 2:
+    if "effectivity" in text:
+        scores["Official Issuances"] += 10
+
+    if "abstract" in text and "research" in text:
+        scores["Research"] += 10
+
+    # -------------------------------
+    # 5. SAFE NER SIGNALS
+    # -------------------------------
+    for ent in doc.ents:
+        if ent.label_ == "DATE":
+            scores["Official Issuances"] += 1
+
+    # -------------------------------
+    # 6. POLICY OVERRIDE (PROTECTED)
+    # -------------------------------
+    if (
+        scores["Policies"] >= 30
+        and not re.search(r"(workshop|orientation|seminar|training|conference)", text)
+        and (
+            "policy" in text
+            or "guidelines" in text
+            or "procedures" in text
+            or "prescribing" in text
+        )
+    ):
+        return "Policies"
+
+    # -------------------------------
+    # 7. CLEAN ADMIN NOISE
+    # -------------------------------
+    if scores["Administrative"] < 5:
+        scores["Administrative"] = 0
+
+    # -------------------------------
+    # 8. FINAL DECISION
+    # -------------------------------
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top_score = sorted_scores[0][1]
+
+    if top_score < 3:
         return "General"
 
-    return best_category
+    top_candidates = [cat for cat, score in sorted_scores if score >= top_score - 2]
 
+    for category in PRIORITY_ORDER:
+        if category in top_candidates:
+            return category
+
+    return sorted_scores[0][0]
 
 
 nlp = spacy.load("en_core_web_sm")
