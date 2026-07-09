@@ -1,0 +1,2495 @@
+# main.py (top-level)
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+from sentence_transformers import SentenceTransformer  # ✅ IMPORT FIRST
+
+#test
+
+
+
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
+from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
+from pydantic import BaseModel
+from sqlalchemy import JSON
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from fastapi.middleware.cors import CORSMiddleware
+import jwt
+import time
+from datetime import datetime
+from passlib.context import CryptContext
+from fastapi import UploadFile, File, Form
+from fastapi.responses import JSONResponse
+from nlp_utils import extract_text_from_file, classify_document
+from fastapi.responses import FileResponse
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from nlp_utils import get_relevant_sentences
+from sqlalchemy import func
+from fastapi import HTTPException, Depends
+import mimetypes
+from nlp_utils import generate_abstractive_summary
+from datetime import datetime, timedelta
+import calendar
+
+
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def require_role(required_roles: list):
+    def role_checker(user):
+        if user.role not in required_roles:
+            raise HTTPException(status_code=403, detail="Access denied")
+    return role_checker
+
+
+# --- FASTAPI APP ---
+app = FastAPI()
+
+# --- CORS MUST BE BEFORE EVERYTHING ELSE ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],       
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Disposition"]
+)
+
+# OAuth2 AFTER CORS
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+# --- CONFIG ---
+DATABASE_URL = "mysql+pymysql://root:Dnsc2025**@localhost/ecmdb"
+SECRET_KEY = "your_secret_key"
+ALGORITHM = "HS256"
+
+Base = declarative_base()   # MUST COME BEFORE MODELS
+
+# --- DATABASE SETUP ---
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# --- USER MODEL ---
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    first_name = Column(String(255))
+    middle_name = Column(String(255))
+    last_name = Column(String(255))
+    suffix = Column(String(50), nullable=True)
+    position = Column(String(255))
+    office = Column(String(255))
+
+    email = Column(String(255), unique=True, index=True)
+    password = Column(String(255))
+
+    role = Column(String(50), default="Viewer")
+    is_active = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# --- DOCUMENT MODEL ---
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255))
+    filepath = Column(String(500))
+    description = Column(Text)
+    category = Column(String(100), default="General")
+
+    year_approved = Column(Integer, nullable=True)   # ✅ NEW FIELD
+
+    document_type = Column(String(50), default="Public")
+    uploaded_by = Column(String(255))
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    embedding = Column(JSON)  # ⭐ ADD THIS
+    summary = Column(Text, nullable=True)  # Add summary field
+
+# --- TOKEN SCHEMA ---
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# Request body for registration
+
+class UserCreate(BaseModel):
+    first_name: str
+    middle_name: str
+    last_name: str
+    suffix: str | None = None
+    position: str
+    office: str
+    email: str
+    password: str
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+
+class Position(Base):
+    __tablename__ = "positions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False)
+
+
+class Office(Base):
+    __tablename__ = "offices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    office_code = Column(String(50), unique=True, nullable=False, index=True)
+    name = Column(String(255), unique=True, nullable=False)
+
+class DocumentLog(Base):
+    __tablename__ = "document_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, index=True)
+    user_email = Column(String(255))
+    action = Column(String(50))        # VIEW
+    source = Column(String(50))        # LIST | SEMANTIC_SEARCH
+    accessed_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DownloadRequest(Base):
+    __tablename__ = "download_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, index=True)
+    document_name = Column(String(255))
+    requester_email = Column(String(255))
+    reason = Column(Text, nullable=True)
+    status = Column(String(20), default="PENDING")  # PENDING | APPROVED | REJECTED
+    requested_at = Column(DateTime, default=datetime.utcnow)
+    downloaded_at = Column(DateTime, nullable=True)  # ✅ ADD THIS
+
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_email = Column(String(255), index=True)
+    document_id = Column(Integer, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+ 
+class Downloadable(Base):
+    __tablename__ = "downloadables"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255))
+    filepath = Column(String(500))
+    uploaded_by = Column(String(255))
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+class DocumentShare(Base):
+    __tablename__ = "document_shares"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, index=True)
+    shared_by = Column(String(255))
+    shared_to = Column(String(255))  # user email
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class ShareRequest(BaseModel):
+    users: list[str]  # list of emails
+
+
+class IsoProcedure(Base):
+    __tablename__ = "iso_procedures"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255))
+    filepath = Column(String(500))
+    uploaded_by = Column(String(255))
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LoginLog(Base):
+    __tablename__ = "login_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255))
+    status = Column(String(20))  # SUCCESS | FAILED
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+Base.metadata.create_all(bind=engine)
+# --- DB DEPENDENCY ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+
+# Register API
+@app.post("/auth/register")
+async def register_user(user: UserCreate, db: Session = Depends(get_db)):
+
+    # Check duplicate email
+    existing = db.query(User).filter(User.email == user.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Hash password
+    hashed_pw = hash_password(user.password)
+
+    # Create user
+    new_user = User(
+        first_name=user.first_name,
+        middle_name=user.middle_name,
+        last_name=user.last_name,
+        suffix=user.suffix,
+        position=user.position,
+        office=user.office,
+        email=user.email,
+        password=hashed_pw,
+        role="Viewer",  # Default role
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"message": "User registered successfully"}
+
+
+# --- LOGIN ---
+
+# @app.post("/auth/login", response_model=Token)
+# async def login(
+#     form_data: OAuth2PasswordRequestForm = Depends(),
+#     db: Session = Depends(get_db)
+# ):
+#     # Find user
+#     user = db.query(User).filter(User.email == form_data.username).first()
+
+#     # If user does not exist
+#     if not user:
+#         raise HTTPException(status_code=400, detail="Invalid username or password")
+
+#     # Block inactive users
+#     if not user.is_active:
+#         raise HTTPException(
+#             status_code=403,
+#             detail="Your account has been deactivated. Please contact the administrator."
+#         )
+
+#     # Password check
+#     if not verify_password(form_data.password, user.password):
+#         raise HTTPException(status_code=400, detail="Invalid username or password")
+
+#     # Create token
+#     payload = {"sub": user.email, "exp": time.time() + 86400} # 24 hours expiration
+#     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+#     return {"access_token": token, "token_type": "bearer"}
+
+from fastapi import Request
+
+@app.post("/auth/login", response_model=Token)
+async def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == form_data.username).first()
+
+    # Get metadata
+    ip = request.client.host
+    user_agent = request.headers.get("user-agent")
+
+    # ❌ USER NOT FOUND
+    if not user:
+        db.add(LoginLog(
+            email=form_data.username,
+            status="FAILED",
+            ip_address=ip,
+            user_agent=user_agent
+        ))
+        db.commit()
+
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+
+    # ❌ INACTIVE USER
+    if not user.is_active:
+        db.add(LoginLog(
+            email=user.email,
+            status="FAILED",
+            ip_address=ip,
+            user_agent=user_agent
+        ))
+        db.commit()
+
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been deactivated. Please contact the administrator."
+        )
+
+    # ❌ WRONG PASSWORD
+    if not verify_password(form_data.password, user.password):
+        db.add(LoginLog(
+            email=user.email,
+            status="FAILED",
+            ip_address=ip,
+            user_agent=user_agent
+        ))
+        db.commit()
+
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+
+    # ✅ SUCCESS LOGIN
+    db.add(LoginLog(
+        email=user.email,
+        status="SUCCESS",
+        ip_address=ip,
+        user_agent=user_agent
+    ))
+    db.commit()
+
+    payload = {"sub": user.email, "exp": time.time() + 86400}
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    return {"access_token": token, "token_type": "bearer"}
+
+# Protected Route
+@app.get("/users/me")
+async def read_users_me(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Query the full User model
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "email": user.email,
+        "first_name": user.first_name,
+        "middle_name": user.middle_name,
+        "last_name": user.last_name,
+        "name": f"{user.first_name} {user.middle_name or ''} {user.last_name}".strip(),
+        "role": user.role
+    }
+
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    try:
+        data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = data["sub"]
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
+
+from sqlalchemy import exists
+from sqlalchemy.orm import Session
+
+def can_access_document(document, current_user, db: Session):
+    """
+    Returns True if the user is allowed to access the document
+    either by role OR by explicit sharing.
+    """
+
+    # -----------------------------
+    # 1️⃣ ROLE-BASED ACCESS
+    # -----------------------------
+    allowed_by_role = False
+
+    if current_user.role in ["Admin", "Uploader"]:
+        allowed_by_role = True
+
+    elif current_user.role in ["Faculty", "Staff"]:
+        # Faculty & Staff cannot access Confidential unless shared
+        if document.document_type != "Confidential":
+            allowed_by_role = True
+
+    elif current_user.role == "Viewer":
+        # Viewer can access Public only unless shared
+        if document.document_type == "Public":
+            allowed_by_role = True
+
+    # -----------------------------
+    # 2️⃣ SHARED ACCESS
+    # -----------------------------
+    is_shared = db.query(
+        exists().where(
+            DocumentShare.document_id == document.id,
+            DocumentShare.shared_to == current_user.email
+        )
+    ).scalar()
+
+    # -----------------------------
+    # ✅ FINAL DECISION
+    # -----------------------------
+    return allowed_by_role or is_shared
+
+#Document upload end point
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+# @app.post("/documents/upload")
+# async def upload_document(
+#     file: UploadFile = File(...),
+#     description: str = Form(""),
+#     category: str = Form("General"),
+#     document_type: str = Form("Public"),
+#     current_user = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     require_role(["Admin", "Uploader"])(current_user)
+
+#     # Save file temporarily to extract its text
+#     file_location = f"{UPLOAD_DIR}/{file.filename}"
+#     with open(file_location, "wb+") as f:
+#         f.write(await file.read())
+
+#     # NLP Classification
+#     if category == "Auto":
+#         file_text = extract_text_from_file(file_location)
+#         combined_text = f"{description}\n{file_text}"
+
+#         category = classify_document(combined_text)
+#         print("AUTO CATEGORY:", category)
+
+#     # Save document record
+#     document = Document(
+#         filename=file.filename,
+#         filepath=file_location,
+#         description=description,
+#         category=category,
+#         document_type=document_type,
+#         uploaded_by=current_user.email
+#     )
+
+#     db.add(document)
+#     db.commit()
+#     db.refresh(document)
+
+#     return {
+#         "message": "File uploaded successfully",
+#         "auto_category": category
+#     }
+
+from pathlib import Path
+import re
+
+@app.post("/documents/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    description: str = Form(""),
+    category: str = Form("General"),
+    year_approved: int = Form(None),
+    document_type: str = Form("Public"),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    # ✅ 1. Get user's office
+    user_office = current_user.office or "UNKNOWN"
+
+    # ✅ 2. Sanitize office (safe for filenames)
+    safe_office = re.sub(r"[^A-Za-z0-9]", "_", user_office).upper()
+
+    # ✅ 3. Get original filename safely
+    original_name = Path(file.filename).name
+
+    # ✅ 4. Build new filename
+    new_filename = f"{safe_office}_{original_name}"
+
+    # ✅ 5. Save file using new filename
+    file_location = os.path.join(UPLOAD_DIR, new_filename)
+
+    with open(file_location, "wb+") as f:
+        f.write(await file.read())
+
+    # NLP auto classification
+    # Extract text ONCE
+    file_text = extract_text_from_file(file_location)
+
+    # Auto classify
+    if category == "Auto":
+        combined_text = f"{description}\n{file_text}"
+        category = classify_document(combined_text)
+
+    # Generate embedding
+    embedding = embedder.encode(
+        file_text[:5000] if file_text else f"{description} {file.filename}"
+    ).tolist()
+
+    # Generate summary
+    if file_text.strip():
+        summary = generate_abstractive_summary(file_text)
+    else:
+        summary = None
+
+    # ✅ 6. Save document record with updated filename
+    document = Document(
+        filename=new_filename,
+        filepath=file_location,
+        description=description,
+        category=category,
+        year_approved=year_approved,
+        document_type=document_type,
+        uploaded_by=current_user.email,
+        embedding=embedding,  # ⭐ SAVE EMBEDDING
+        summary=summary  # ⭐ SAVE SUMMARY
+    )
+    
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+
+    return {
+        "message": "File uploaded successfully",
+        "filename": new_filename,
+        "auto_category": category,
+        "year_approved": year_approved
+    }
+
+
+
+
+#Document list endpoint
+from fastapi import Query
+
+@app.get("/documents/list")
+async def list_documents(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, le=100),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    query = db.query(Document)
+
+    # RBAC
+    if current_user.role == "Viewer":
+        query = query.filter(Document.document_type == "Public")
+
+    elif current_user.role in ["Faculty", "Staff"]:
+        query = query.filter(Document.document_type != "Confidential")
+
+    total = query.count()
+
+    docs = (
+        query
+        .order_by(Document.uploaded_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    # ⭐ FAVORITES (optimized)
+    user_favorites = db.query(Favorite.document_id).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    favorite_ids = {f.document_id for f in user_favorites}
+
+    result = []
+
+    for d in docs:
+        uploader = db.query(User).filter(User.email == d.uploaded_by).first()
+
+        shared_count = db.query(DocumentShare).filter(
+            DocumentShare.document_id == d.id
+        ).count()
+
+        result.append({
+            "id": d.id,
+            "filename": d.filename,
+            "description": d.description,
+            "category": d.category,
+            "year_approved": d.year_approved,
+            "document_type": d.document_type,
+            "uploaded_by": uploader.office if uploader else d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+            "is_favorite": d.id in favorite_ids,
+            "shared_count": shared_count
+        })
+
+    return {
+        "data": result,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+
+
+
+from fastapi.staticfiles import StaticFiles
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+
+
+#change password
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+@app.post("/auth/change-password")
+async def change_password(
+    req: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme)
+):
+    # Decode token
+    try:
+        user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_email = user_data["sub"]
+    except:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Get user
+    user = db.query(User).filter(User.email == user_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check old password
+    if not verify_password(req.old_password, user.password):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Update new password
+    user.password = hash_password(req.new_password)
+    db.commit()
+
+    return {"message": "Password updated successfully"}
+
+@app.get("/admin/users")
+def list_all_users(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+    return db.query(User).all()
+
+
+@app.delete("/documents/{doc_id}")
+async def delete_document(
+    doc_id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    document = db.query(Document).filter(Document.id == doc_id).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # ✅ ADMIN can delete any document
+    if current_user.role == "Admin":
+        pass
+
+    # ✅ UPLOADER can delete ONLY their own uploads
+    elif current_user.role == "Uploader":
+        if document.uploaded_by != current_user.email:
+            raise HTTPException(status_code=403, detail="You can only delete your own uploads")
+
+    # ❌ Everyone else cannot delete
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Delete file from disk
+    if os.path.exists(document.filepath):
+        os.remove(document.filepath)
+
+    db.delete(document)
+    db.commit()
+
+    return {"message": "Document deleted successfully"}
+
+
+#Get all users - Admin only
+@app.get("/users")
+async def list_users(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    users = db.query(User).all()
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "first_name": u.first_name,
+            "middle_name": u.middle_name,
+            "last_name": u.last_name,
+            "role": u.role,
+            "is_active": u.is_active,
+            "created_at": u.created_at,
+        }
+        for u in users
+    ]
+
+
+
+#Update User Role
+@app.put("/users/{user_id}/role")
+async def update_user_role(
+    user_id: int,
+    role: str,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.role = role
+    db.commit()
+    return {"message": "User role updated"}
+
+
+#Delete User
+@app.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.delete(user)
+    db.commit()
+
+    return {"message": "User deleted"}
+
+#user update model
+# class UserUpdate(BaseModel):
+#     name: str
+#     email: str
+#     role: str
+
+class UserUpdate(BaseModel):
+    first_name: str
+    middle_name: str | None = None
+    last_name: str
+    email: str
+    role: str
+
+
+#Update User
+@app.put("/users/{user_id}")
+async def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.first_name = user_data.first_name
+    user.middle_name = user_data.middle_name
+    user.last_name = user_data.last_name
+    user.email = user_data.email
+    user.role = user_data.role
+
+    db.commit()
+    db.refresh(user)
+
+    return {"message": "User updated successfully"}
+
+
+#change password model
+class PasswordChange(BaseModel):
+    old_password: str | None = None
+    new_password: str
+
+#change password route
+@app.put("/users/{user_id}/password")
+async def change_password(
+    user_id: int,
+    data: PasswordChange,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Admin can reset passwords without old password
+    if current_user.role != "Admin":
+        if not verify_password(data.old_password, user.password):
+            raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Hash new password
+    user.password = hash_password(data.new_password)
+    db.commit()
+
+    return {"message": "Password updated successfully"}
+
+#Update User Status
+@app.put("/users/{user_id}/status")
+async def update_user_status(
+    user_id: int,
+    status: UserStatusUpdate,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    user.is_active = status.is_active
+    db.commit()
+
+    return {"message": "Status updated"}
+
+
+# @app.get("/documents/preview/{doc_id}")
+# async def preview_document(doc_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+#     document = db.query(Document).filter(Document.id == doc_id).first()
+#     if not document:
+#         raise HTTPException(status_code=404, detail="Document not found")
+
+#     return FileResponse(
+#         document.filepath,
+#         media_type="application/pdf",
+#         filename=document.filename
+        
+#         )
+
+from fastapi.responses import FileResponse
+from fastapi import HTTPException, Depends
+import mimetypes
+
+@app.get("/documents/preview/{doc_id}")
+async def preview_document(
+    doc_id: int,
+    source: str = "LIST",
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    document = db.query(Document).filter(Document.id == doc_id).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # ✅ NEW UNIFIED ACCESS CHECK
+    if not can_access_document(document, current_user, db):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    mime_type, _ = mimetypes.guess_type(document.filepath)
+
+    # ✅ LOG VIEW
+    log = DocumentLog(
+        document_id=document.id,
+        user_email=current_user.email,
+        action="VIEW",
+        source=source.upper()
+    )
+    db.add(log)
+    db.commit()
+
+    return FileResponse(
+        path=document.filepath,
+        media_type=mime_type or "application/octet-stream",
+        headers={"Content-Disposition": "inline"}
+    )
+
+
+
+from fastapi import Query
+
+@app.get("/documents/download/{doc_id}")
+def download_document(
+    doc_id: int,
+    token: str,
+    source: str = "PREVIEW",
+    db: Session = Depends(get_db)
+):
+    user = get_current_user(token, db)
+
+    # ✅ LOAD DOCUMENT FIRST
+    document = db.query(Document).filter(Document.id == doc_id).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # ✅ ACCESS CHECK (ROLE OR SHARED)
+    if not can_access_document(document, user, db):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # ✅ CHECK IF SHARED
+    is_shared = db.query(
+        exists().where(
+            DocumentShare.document_id == document.id,
+            DocumentShare.shared_to == user.email
+        )
+    ).scalar()
+
+    # ✅ VIEWER DOWNLOAD APPROVAL (ONLY IF NOT SHARED)
+    if user.role == "Viewer" and not is_shared:
+
+        req = db.query(DownloadRequest).filter(
+            DownloadRequest.document_id == document.id,
+            DownloadRequest.requester_email == user.email,
+            DownloadRequest.status == "APPROVED",
+            DownloadRequest.downloaded_at == None
+        ).first()
+
+        if not req:
+            raise HTTPException(
+                status_code=403,
+                detail="Download request not approved or already used"
+            )
+
+        req.downloaded_at = datetime.utcnow()
+        db.commit()
+
+    # ✅ LOG DOWNLOAD
+    log = DocumentLog(
+        document_id=document.id,
+        user_email=user.email,
+        action="DOWNLOAD",
+        source=source.upper()
+    )
+    db.add(log)
+    db.commit()
+
+    # ✅ RETURN FILE
+    return FileResponse(
+        path=document.filepath,
+        filename=document.filename,
+        media_type="application/octet-stream"
+    )
+
+
+@app.get("/documents/details/{doc_id}")
+async def document_details(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Viewer → Public only
+    if current_user.role == "Viewer" and doc.document_type != "Public":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Faculty & Staff → no Confidential
+    if doc.document_type == "Confidential" and current_user.role in ["Faculty", "Staff"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+      # ✅ LOG DETAILS VIEW
+    log = DocumentLog(
+        document_id=doc.id,
+        user_email=current_user.email,
+        action="VIEW",
+        source="LIST"
+    )
+    db.add(log)
+    db.commit()
+
+    return {
+        "filename": doc.filename,
+        "description": doc.description,
+        "category": doc.category,
+        "document_type": doc.document_type,
+        "uploaded_by": doc.uploaded_by,
+        "uploaded_at": doc.uploaded_at,
+    }
+
+
+# @app.get("/documents/text/{doc_id}")
+# async def get_document_text(doc_id: int, db: Session = Depends(get_db)):
+#     doc = db.query(Document).filter(Document.id == doc_id).first()
+#     if not doc:
+#         raise HTTPException(status_code=404, detail="Document not found")
+
+#     text = extract_text_from_file(doc.filepath)
+#     return {"text": text}
+
+@app.get("/positions")
+async def get_positions(
+    db: Session = Depends(get_db)
+):
+    return db.query(Position).order_by(Position.name).all()
+
+
+@app.get("/offices")
+async def get_offices(db: Session = Depends(get_db)):
+    offices = db.query(Office).order_by(Office.name).all()
+
+    return [
+        {
+            "id": o.id,
+            "office_code": o.office_code,
+            "name": o.name
+        }
+        for o in offices
+    ]
+
+@app.get("/admin/positions")
+def list_positions(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+    return db.query(Position).order_by(Position.name).all()
+
+
+@app.post("/admin/positions")
+def create_position(
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    if db.query(Position).filter(Position.name == name).first():
+        raise HTTPException(400, "Position already exists")
+
+    pos = Position(name=name)
+    db.add(pos)
+    db.commit()
+    return {"message": "Position created"}
+
+
+@app.delete("/admin/positions/{id}")
+def delete_position(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    pos = db.query(Position).get(id)
+    if not pos:
+        raise HTTPException(404, "Position not found")
+
+    db.delete(pos)
+    db.commit()
+    return {"message": "Position deleted"}
+
+@app.get("/admin/offices")
+def list_offices(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+    return db.query(Office).order_by(Office.name).all()
+
+
+@app.post("/admin/offices")
+def create_office(
+    office_code: str = Form(...),
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    if db.query(Office).filter(
+        (Office.office_code == office_code) | (Office.name == name)
+    ).first():
+        raise HTTPException(400, "Office already exists")
+
+    office = Office(office_code=office_code.upper(), name=name)
+    db.add(office)
+    db.commit()
+    return {"message": "Office created"}
+
+
+@app.delete("/admin/offices/{id}")
+def delete_office(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    office = db.query(Office).get(id)
+    if not office:
+        raise HTTPException(404, "Office not found")
+
+    db.delete(office)
+    db.commit()
+    return {"message": "Office deleted"}
+
+from math import ceil
+from fastapi import Query
+
+@app.get("/documents/my-uploads")
+async def my_uploads(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, le=100),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # ✅ RBAC
+    if current_user.role not in ["Admin", "Uploader"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # ✅ BASE QUERY
+    base_query = db.query(Document).filter(
+        Document.uploaded_by == current_user.email
+    )
+
+    total = base_query.count()
+
+    # ✅ PAGINATION
+    docs = (
+        base_query
+        .order_by(Document.uploaded_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    # ✅ GET USER FAVORITES (for star toggle if needed)
+    user_favorites = db.query(Favorite.document_id).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    favorite_ids = {f.document_id for f in user_favorites}
+
+    # ✅ GET UPLOADER INFO IN ONE QUERY
+    uploader = db.query(User).filter(
+        User.email == current_user.email
+    ).first()
+
+    uploader_name = uploader.office if uploader else current_user.email
+
+   
+
+    result = []
+
+    for d in docs:
+        shared_count = db.query(DocumentShare).filter(
+            DocumentShare.document_id == d.id
+        ).count()
+
+        result.append({
+            "id": d.id,
+            "filename": d.filename,
+            "description": d.description,
+            "category": d.category,
+            "year_approved": d.year_approved,
+            "document_type": d.document_type,
+            "uploaded_by": uploader_name,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+            "is_favorite": d.id in favorite_ids,
+            "shared_count": shared_count
+        })
+
+    return {
+        "data": result,
+        "total": total,
+        "page": page,
+        "pages": ceil(total / limit)
+    }
+
+
+# @app.get("/documents/semantic-search")
+# async def semantic_search(
+#     query: str,
+#     year_from: int | None = None,   # ✅ NEW
+#     year_to: int | None = None,     # ✅ NEW
+#     db: Session = Depends(get_db),
+#     current_user = Depends(get_current_user)
+# ):
+#     if not query.strip():
+#         return []
+
+    # # Encode query
+    # query_embedding = embedder.encode(query).reshape(1, -1)
+
+    # # -----------------------------
+    # # 🔎 BASE QUERY (WITH YEAR FILTER)
+    # # -----------------------------
+    # doc_query = db.query(Document).filter(Document.embedding != None)
+
+    # # RBAC filtering
+    # if current_user.role == "Viewer":
+    #     doc_query = doc_query.filter(Document.document_type == "Public")
+    # elif current_user.role in ["Faculty", "Staff"]:
+    #     doc_query = doc_query.filter(Document.document_type != "Confidential")
+
+    # # ✅ YEAR FILTER (APPLIED FIRST)
+    # if year_from:
+    #     doc_query = doc_query.filter(Document.year_approved >= year_from)
+
+    # if year_to:
+    #     doc_query = doc_query.filter(Document.year_approved <= year_to)
+
+    # docs = doc_query.all()
+
+    # if not docs:
+    #     return []
+
+    # -----------------------------
+    # 🧠 SEMANTIC SCORING
+    # # -----------------------------
+    # results = []
+
+    # for doc in docs:
+    #     doc_embedding = np.array(doc.embedding).reshape(1, -1)
+    #     score = cosine_similarity(query_embedding, doc_embedding)[0][0]
+
+    #     if score > 0.35:  # similarity threshold
+    #         results.append({
+    #             "id": doc.id,
+    #             "filename": doc.filename,
+    #             "description": doc.description,
+    #             "category": doc.category,
+    #             "year_approved": doc.year_approved,   # ✅ INCLUDED
+    #             "document_type": doc.document_type,
+    #             "uploaded_by": doc.uploaded_by,
+    #             "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+    #             "score": round(float(score), 3)
+    #         })
+
+    # # Sort by relevance
+    # results.sort(key=lambda x: x["score"], reverse=True)
+
+    # return results
+
+
+@app.get("/documents/semantic-search")
+async def semantic_search(
+    query: str,
+    category: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    page: int = 1,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    if not query.strip():
+        return {"data": [], "total": 0, "pages": 1}
+
+    query_embedding = embedder.encode(query).reshape(1, -1)
+
+    doc_query = db.query(Document).filter(Document.embedding != None)
+
+    # RBAC
+    if current_user.role == "Viewer":
+        doc_query = doc_query.filter(Document.document_type == "Public")
+    elif current_user.role in ["Faculty", "Staff"]:
+        doc_query = doc_query.filter(Document.document_type != "Confidential")
+
+    # Filters
+    if year_from:
+        doc_query = doc_query.filter(Document.year_approved >= year_from)
+
+    if year_to:
+        doc_query = doc_query.filter(Document.year_approved <= year_to)
+
+    if category:
+        doc_query = doc_query.filter(
+            func.lower(func.trim(Document.category)) == category.lower().strip()
+        )
+
+    docs = doc_query.all()
+    SIMILARITY_THRESHOLD = 0.2  # ✅ adjust if needed
+
+    results = []
+
+    for doc in docs:
+        doc_embedding = np.array(doc.embedding).reshape(1, -1)
+        score = cosine_similarity(query_embedding, doc_embedding)[0][0]
+
+        # ✅ OPTIONAL: normalize score (0 to 1 range)
+        # score = (score + 1) / 2
+
+        # ✅ KEYWORD BOOST (improves relevance)
+        keyword_boost = 0
+        query_lower = query.lower()
+
+        if query_lower in (doc.filename or "").lower():
+            keyword_boost += 0.1
+
+        if query_lower in (doc.category or "").lower():
+            keyword_boost += 0.1
+
+        final_score = score + keyword_boost
+
+        # ✅ FILTER OUT IRRELEVANT RESULTS
+        if final_score < SIMILARITY_THRESHOLD:
+            continue
+
+        shared_count = db.query(DocumentShare).filter(
+            DocumentShare.document_id == doc.id
+        ).count()
+
+        results.append({
+            "id": doc.id,
+            "filename": doc.filename,
+            "category": doc.category,
+            "uploaded_by": doc.uploaded_by,
+            "uploaded_at": doc.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+            "score": round(float(final_score), 3),  # ✅ use boosted score
+            "summary": doc.summary,
+            "shared_count": shared_count
+        })
+
+    # ✅ HANDLE NO RESULTS
+    if not results:
+        return {
+            "data": [],
+            "total": 0,
+            "pages": 1,
+            "message": "No relevant documents found"
+        }
+
+    # sort by relevance
+    results.sort(key=lambda x: x["score"], reverse=True)
+
+    total = len(results)
+
+    start = (page - 1) * limit
+    end = start + limit
+
+    paginated = results[start:end]
+
+    return {
+        "data": paginated,
+        "total": total,
+        "pages": (total + limit - 1) // limit
+    }
+
+
+
+from nlp_utils import get_relevant_sentences
+
+@app.get("/documents/highlights/{doc_id}")
+async def document_highlights(
+    doc_id: int,
+    query: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # RBAC check
+    if current_user.role == "Viewer" and doc.document_type != "Public":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    text = extract_text_from_file(doc.filepath)
+
+    highlights = get_relevant_sentences(
+        text=text,
+        query=query,
+        embedder=embedder,
+        top_k=5
+    )
+
+    return highlights
+
+
+
+
+@app.put("/admin/offices/{id}")
+def update_office(
+    id: int,
+    office_code: str = Form(...),
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    office = db.query(Office).filter(Office.id == id).first()
+    if not office:
+        raise HTTPException(status_code=404, detail="Office not found")
+
+    # prevent duplicates
+    if db.query(Office).filter(
+        Office.id != id,
+        ((Office.office_code == office_code) | (Office.name == name))
+    ).first():
+        raise HTTPException(status_code=400, detail="Office already exists")
+
+    office.office_code = office_code.upper()
+    office.name = name
+    db.commit()
+
+    return {"message": "Office updated successfully"}
+
+@app.put("/admin/positions/{id}")
+def update_position(
+    id: int,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    require_role(["Admin"])(current_user)
+
+    position = db.query(Position).filter(Position.id == id).first()
+    if not position:
+        raise HTTPException(status_code=404, detail="Position not found")
+
+    # Prevent duplicates
+    if db.query(Position).filter(
+        Position.id != id,
+        Position.name == name
+    ).first():
+        raise HTTPException(status_code=400, detail="Position already exists")
+
+    position.name = name
+    db.commit()
+
+    return {"message": "Position updated successfully"}
+
+
+@app.get("/admin/document-logs")
+async def get_document_logs(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    logs = (
+        db.query(DocumentLog, Document.filename)
+        .join(Document, Document.id == DocumentLog.document_id)
+        .order_by(DocumentLog.accessed_at.desc())
+        .all()
+    )
+
+ # logs is a list of tuples: (DocumentLog, filename)
+    result = []
+
+    for log_entry, filename in logs:
+        result.append({
+            "id": log_entry.id,
+            "document_id": log_entry.document_id,
+            "document": filename,
+            "user": log_entry.user_email,
+            "action": log_entry.action,
+            "source": log_entry.source,
+            "accessed_at": log_entry.accessed_at.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+    return result
+
+
+
+
+class DownloadRequestCreate(BaseModel):
+    reason: str | None = None
+
+
+@app.post("/documents/{doc_id}/request-download")
+async def request_download(
+    doc_id: int,
+    data: DownloadRequestCreate,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Only Viewer can request
+    if current_user.role != "Viewer":
+        raise HTTPException(403, "Only viewers can request downloads")
+
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    req = DownloadRequest(
+        document_id=doc.id,
+        document_name=doc.filename,
+        requester_email=current_user.email,
+        reason=data.reason
+    )
+
+    db.add(req)
+    db.commit()
+
+    return {"message": "Download request submitted"}
+
+
+@app.get("/admin/download-requests")
+async def list_download_requests(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    requests = db.query(DownloadRequest).order_by(
+        DownloadRequest.requested_at.desc()
+    ).all()
+
+    return [
+        {
+            "id": r.id,
+            "document_id": r.document_id,
+            "document_name": r.document_name,
+            "requester_email": r.requester_email,
+            "reason": r.reason,
+            "status": r.status,
+            "requested_at": r.requested_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for r in requests
+    ]
+
+
+# @app.put("/admin/download-requests/{request_id}")
+# async def update_download_request(
+#     request_id: int,
+#     status: str = Query(..., regex="^(APPROVED|REJECTED)$"),
+#     current_user = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     require_role(["Admin"])(current_user)
+
+#     req = db.query(DownloadRequest).filter(
+#         DownloadRequest.id == request_id
+#     ).first()
+
+#     if not req:
+#         raise HTTPException(404, "Request not found")
+
+#     req.status = status
+#     req.reviewed_at = datetime.utcnow()
+#     req.reviewed_by = current_user.email
+
+#     db.commit()
+
+#     return {"message": f"Request {status.lower()} successfully"}
+@app.put("/download-requests/{request_id}")
+async def update_download_request(
+    request_id: int,
+    status: str = Query(..., regex="^(APPROVED|REJECTED)$"),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    
+    req = db.query(DownloadRequest).filter(
+        DownloadRequest.id == request_id
+    ).first()
+
+    if not req:
+        raise HTTPException(404, "Request not found")
+
+    # Get document
+    doc = db.query(Document).filter(
+        Document.id == req.document_id
+    ).first()
+
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    # ✅ Admin can approve any request
+    if current_user.role == "Admin":
+        pass
+
+    # ✅ Uploader can approve ONLY their document
+    elif current_user.role == "Uploader":
+        if doc.uploaded_by != current_user.email:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only approve requests for your own documents"
+            )
+
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    req.status = status
+    req.reviewed_at = datetime.utcnow()
+    req.reviewed_by = current_user.email
+
+    db.commit()
+
+    return {"message": f"Request {status.lower()} successfully"}
+
+
+@app.get("/documents/my-download-requests")
+async def my_download_requests(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # requests = (
+    #     db.query(DownloadRequest)
+    #     .filter(DownloadRequest.requester_email == current_user.email)
+    #     .order_by(DownloadRequest.requested_at.desc())
+    #     .all()
+    # )
+
+
+    #new
+    requests = (
+    db.query(DownloadRequest)
+    .filter(
+        DownloadRequest.requester_email == current_user.email,
+        DownloadRequest.downloaded_at == None   # 👈 hide used
+    )
+    .order_by(DownloadRequest.requested_at.desc())
+    .all()
+    )
+
+
+    return [
+        {
+            "id": r.id,
+            "document_id": r.document_id,
+            "document_name": r.document_name,
+            "reason": r.reason,
+            "status": r.status,
+            "requested_at": r.requested_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for r in requests
+    ]
+
+
+@app.post("/documents/{doc_id}/favorite")
+async def toggle_favorite(
+    doc_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    fav = db.query(Favorite).filter(
+        Favorite.user_email == current_user.email,
+        Favorite.document_id == doc_id
+    ).first()
+
+    if fav:
+        db.delete(fav)
+        db.commit()
+        return {"status": "removed"}
+
+    new_fav = Favorite(
+        user_email=current_user.email,
+        document_id=doc_id
+    )
+    db.add(new_fav)
+    db.commit()
+
+    return {"status": "added"}
+
+
+@app.get("/documents/favorites")
+async def get_my_favorites(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    favs = db.query(Favorite).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    doc_ids = [f.document_id for f in favs]
+
+    docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
+
+    return [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "category": d.category,
+            "document_type": d.document_type,
+            "uploaded_by": d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for d in docs
+    ]
+
+
+@app.get("/documents/my-favorites")
+async def my_favorites(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    favorites = db.query(Favorite).filter(
+        Favorite.user_email == current_user.email
+    ).all()
+
+    if not favorites:
+        return []
+
+    doc_ids = [f.document_id for f in favorites]
+
+    query = db.query(Document).filter(Document.id.in_(doc_ids))
+
+    # RBAC
+    if current_user.role == "Viewer":
+        query = query.filter(Document.document_type == "Public")
+
+    elif current_user.role in ["Faculty", "Staff"]:
+        query = query.filter(Document.document_type != "Confidential")
+
+    docs = query.order_by(Document.uploaded_at.desc()).all()
+
+    result = []
+
+    for d in docs:
+        uploader = db.query(User).filter(User.email == d.uploaded_by).first()
+
+        result.append({
+            "id": d.id,
+            "filename": d.filename,
+            "description": d.description,
+            "category": d.category,
+            "year_approved": d.year_approved,
+            "document_type": d.document_type,
+            "uploaded_by": uploader.office if uploader else d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+            "is_favorite": True
+        })
+
+    return result
+
+
+@app.get("/documents/downloadable")
+async def downloadable_documents(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    docs = (
+        db.query(Document)
+        .filter(Document.document_type == "Public")
+        .order_by(Document.uploaded_at.desc())
+        .all()
+    )
+
+    result = []
+
+    for d in docs:
+        uploader = db.query(User).filter(User.email == d.uploaded_by).first()
+
+        result.append({
+            "id": d.id,
+            "filename": d.filename,
+            "description": d.description,
+            "category": d.category,
+            "year_approved": d.year_approved,
+            "document_type": d.document_type,
+            "uploaded_by": uploader.office if uploader else d.uploaded_by,
+            "uploaded_at": d.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+        })
+
+    return result
+
+
+@app.post("/downloadables/upload")
+async def upload_downloadable(
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    file_location = os.path.join("uploads", file.filename)
+
+    with open(file_location, "wb+") as f:
+        f.write(await file.read())
+
+    new_file = Downloadable(
+        filename=file.filename,
+        filepath=file_location,
+        uploaded_by=current_user.email
+    )
+
+    db.add(new_file)
+    db.commit()
+
+    return {"message": "File uploaded successfully"}
+
+
+
+@app.get("/downloadables/list")
+async def list_downloadables(
+    page: int = 1,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    query = db.query(Downloadable)
+
+    total = query.count()
+
+    files = (
+        query.order_by(Downloadable.uploaded_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    result = []
+
+    for f in files:
+        uploader = db.query(User).filter(User.email == f.uploaded_by).first()
+
+        result.append({
+            "id": f.id,
+            "filename": f.filename,
+            "uploaded_by": uploader.office if uploader else f.uploaded_by,
+            "uploaded_at": f.uploaded_at.strftime("%Y-%m-%d %H:%M") if f.uploaded_at else None,
+        })
+
+    return {
+        "data": result,
+        "total": total,
+        "page": page,
+        "pages": ceil(total / limit)
+    }
+
+
+
+@app.get("/downloadables/download/{file_id}")
+async def download_downloadable(
+    file_id: int,
+    token: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+    except:
+        raise HTTPException(401, "Invalid token")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(401, "Invalid user")
+
+    file = db.query(Downloadable).filter(Downloadable.id == file_id).first()
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    return FileResponse(
+        path=file.filepath,
+        filename=file.filename,
+        media_type="application/octet-stream"
+    )
+
+from fastapi import Query
+
+@app.get("/downloadables/preview/{id}")
+async def preview_downloadable(
+    id: int,
+    token: str = Query(None),
+    db: Session = Depends(get_db)
+):
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    email = payload.get("sub")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(401, "Invalid user")
+
+    file = db.query(Downloadable).filter(Downloadable.id == id).first()
+
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    if not os.path.exists(file.filepath):
+        raise HTTPException(404, "Missing file")
+
+    # ✅ USE FILENAME FOR MIME DETECTION
+    mime_type, _ = mimetypes.guess_type(file.filename)
+
+    return FileResponse(
+        path=file.filepath,
+        media_type=mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": f'inline; filename="{file.filename}"'
+        }
+    )
+
+
+@app.delete("/downloadables/{file_id}")
+async def delete_downloadable(
+    file_id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    file = db.query(Downloadable).filter(Downloadable.id == file_id).first()
+
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    # uploader can delete only own file
+    if current_user.role == "Uploader" and file.uploaded_by != current_user.email:
+        raise HTTPException(403, "Not allowed")
+
+    if os.path.exists(file.filepath):
+        os.remove(file.filepath)
+
+    db.delete(file)
+    db.commit()
+
+    return {"message": "File deleted successfully"}
+
+
+@app.post("/documents/{doc_id}/share")
+def share_document(
+    doc_id: int,
+    data: ShareRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    if current_user.role == "Uploader" and doc.uploaded_by != current_user.email:
+        raise HTTPException(403, "You can only share your own documents")
+
+    shared_count = 0   # ⭐ ADD COUNTER
+
+    for email in data.users:
+
+        if email == doc.uploaded_by:
+            continue
+
+        if email == current_user.email:
+            continue
+
+        existing = db.query(DocumentShare).filter(
+            DocumentShare.document_id == doc_id,
+            DocumentShare.shared_to == email
+        ).first()
+
+        if existing:
+            continue
+
+        db.add(DocumentShare(
+            document_id=doc_id,
+            shared_by=current_user.email,
+            shared_to=email
+        ))
+
+        shared_count += 1   # ⭐ COUNT SUCCESS
+
+    if shared_count == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid users to share with"
+        )
+
+    db.commit()
+
+    return {"message": f"Shared with {shared_count} user(s)"}
+
+
+@app.get("/documents/shared-with-me")
+def shared_with_me(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    shares = db.query(DocumentShare).filter(
+        DocumentShare.shared_to == current_user.email
+    ).all()
+
+    doc_ids = [s.document_id for s in shares]
+
+    docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
+
+    return docs
+
+
+@app.delete("/documents/{doc_id}/share/{email}")
+def revoke_share(
+    doc_id: int,
+    email: str,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    share = db.query(DocumentShare).filter_by(
+        document_id=doc_id,
+        shared_to=email
+    ).first()
+
+    if not share:
+        raise HTTPException(404, "Share not found")
+
+    db.delete(share)
+    db.commit()
+
+    return {"message": "Access revoked"}
+
+
+@app.get("/documents/{doc_id}/shares")
+def get_document_shares(
+    doc_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    shares = db.query(DocumentShare).filter(
+        DocumentShare.document_id == doc_id
+    ).all()
+
+    return shares
+
+from sqlalchemy import func, extract
+from datetime import datetime, timedelta
+
+@app.get("/dashboard/stats")
+def dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    start_of_week = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
+
+    # 👑 ADMIN → SYSTEM STATS
+    if current_user.role == "Admin":
+
+        total_docs = db.query(func.count(Document.id)).scalar()
+
+        weekly_uploads = db.query(func.count(Document.id)).filter(
+            Document.uploaded_at >= start_of_week
+        ).scalar()
+
+        recent_docs = db.query(Document).order_by(
+            Document.uploaded_at.desc()
+        ).limit(5).all()
+
+    # 📤 UPLOADER → PERSONAL STATS
+    elif current_user.role == "Uploader":
+
+        total_docs = db.query(func.count(Document.id)).filter(
+            Document.uploaded_by == current_user.email
+        ).scalar()
+
+        weekly_uploads = db.query(func.count(Document.id)).filter(
+            Document.uploaded_by == current_user.email,
+            Document.uploaded_at >= start_of_week
+        ).scalar()
+
+        recent_docs = db.query(Document).filter(
+            Document.uploaded_by == current_user.email
+        ).order_by(Document.uploaded_at.desc()).limit(5).all()
+
+    # 👀 VIEWER / FACULTY / STAFF
+    else:
+
+        total_docs = db.query(func.count(DocumentShare.id)).filter(
+            DocumentShare.shared_to == current_user.email
+        ).scalar()
+
+        weekly_uploads = 0
+
+        recent_docs = db.query(Document).join(
+            DocumentShare,
+            DocumentShare.document_id == Document.id
+        ).filter(
+            DocumentShare.shared_to == current_user.email
+        ).order_by(Document.uploaded_at.desc()).limit(5).all()
+
+    return {
+        "role": current_user.role,
+        "total_documents": total_docs,
+        "weekly_uploads": weekly_uploads,
+        "recent": [
+            {"id": d.id, "title": d.filename}
+            for d in recent_docs
+        ]
+    }
+
+@app.get("/dashboard/upload-activity")
+def upload_activity(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    query = db.query(
+        extract("year", Document.uploaded_at).label("year"),
+        extract("month", Document.uploaded_at).label("month"),
+        func.count(Document.id)
+    )
+
+    # 📤 UPLOADER → PERSONAL DATA
+    if current_user.role == "Uploader":
+        query = query.filter(
+            Document.uploaded_by == current_user.email
+        )
+
+    # 👀 VIEWER / FACULTY / STAFF → NO DATA
+    elif current_user.role not in ["Admin"]:
+        return []
+
+    query = query.group_by("year", "month").order_by("year", "month")
+
+    results = query.all()
+
+    return [
+        {
+            "label": f"{calendar.month_abbr[int(r.month)]} {int(r.year)}",
+            "count": r[2]
+        }
+        for r in results
+    ]
+
+
+@app.get("/dashboard/document-type-distribution")
+def document_type_distribution(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    query = db.query(
+        Document.document_type,
+        func.count(Document.id)
+    )
+
+    # 📤 UPLOADER → PERSONAL DATA
+    if current_user.role == "Uploader":
+        query = query.filter(
+            Document.uploaded_by == current_user.email
+        )
+
+    # 👀 VIEWER / FACULTY / STAFF → NO DATA
+    elif current_user.role not in ["Admin"]:
+        return []
+
+    query = query.group_by(Document.document_type)
+
+    results = query.all()
+
+    return [
+        {
+            "type": r[0] or "Unknown",
+            "count": r[1]
+        }
+        for r in results
+    ]
+
+from sqlalchemy import func, desc
+
+@app.get("/dashboard/most-viewed")
+def most_viewed_documents(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    query = db.query(
+        Document.id,
+        Document.filename,
+        func.count(DocumentLog.id).label("views")
+    ).join(
+        DocumentLog, DocumentLog.document_id == Document.id
+    ).filter(
+        DocumentLog.action == "VIEW"
+    )
+
+    # 📤 UPLOADER → ONLY MY DOCUMENTS
+    if current_user.role == "Uploader":
+        query = query.filter(
+            Document.uploaded_by == current_user.email
+        )
+
+    # 👀 VIEWER / FACULTY / STAFF → NO ACCESS
+    elif current_user.role not in ["Admin"]:
+        return []
+
+    results = query.group_by(
+        Document.id
+    ).order_by(
+        desc("views")
+    ).limit(5).all()
+
+    return [
+        {
+            "id": r.id,
+            "title": r.filename,
+            "views": r.views
+        }
+        for r in results
+    ]
+
+
+
+@app.get("/download-requests/pending-for-me")
+async def pending_requests_for_me(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    # -------------------------
+    # ADMIN → see all requests
+    # -------------------------
+    if current_user.role == "Admin":
+
+        requests = (
+            db.query(DownloadRequest, Document.filename)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .order_by(DownloadRequest.requested_at.desc())
+            .all()
+        )
+
+    # -------------------------
+    # UPLOADER → only own docs
+    # -------------------------
+    elif current_user.role == "Uploader":
+
+        requests = (
+            db.query(DownloadRequest, Document.filename)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .filter(Document.uploaded_by == current_user.email)
+            .order_by(DownloadRequest.requested_at.desc())
+            .all()
+        )
+
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    result = []
+
+    for req, filename in requests:
+        result.append({
+            "id": req.id,
+            "document_id": req.document_id,
+            "document_name": filename,
+            "requester_email": req.requester_email,
+            "reason": req.reason,
+            "status": req.status,
+            "requested_at": req.requested_at.strftime("%Y-%m-%d %H:%M")
+        })
+
+    return result
+
+
+@app.get("/notifications/pending-requests")
+def pending_request_notifications(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    # ADMIN → all pending
+    if current_user.role == "Admin":
+
+        count = db.query(DownloadRequest).filter(
+            DownloadRequest.status == "PENDING"
+        ).count()
+
+    # UPLOADER → pending requests for own docs
+    elif current_user.role == "Uploader":
+
+        count = (
+            db.query(DownloadRequest)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .filter(
+                Document.uploaded_by == current_user.email,
+                DownloadRequest.status == "PENDING"
+            )
+            .count()
+        )
+
+    else:
+        return {"count": 0}
+
+    return {"count": count}
+
+
+@app.get("/notifications/pending-request-list")
+def notification_list(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+
+    if current_user.role == "Admin":
+
+        requests = (
+            db.query(DownloadRequest, Document.filename)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .filter(DownloadRequest.status == "PENDING")
+            .order_by(DownloadRequest.requested_at.desc())
+            .limit(5)
+            .all()
+        )
+
+    elif current_user.role == "Uploader":
+
+        requests = (
+            db.query(DownloadRequest, Document.filename)
+            .join(Document, Document.id == DownloadRequest.document_id)
+            .filter(
+                Document.uploaded_by == current_user.email,
+                DownloadRequest.status == "PENDING"
+            )
+            .order_by(DownloadRequest.requested_at.desc())
+            .limit(5)
+            .all()
+        )
+
+    else:
+        return []
+
+    return [
+        {
+            "id": r.id,
+            "document": filename,
+            "requester": r.requester_email,
+            "time": r.requested_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for r, filename in requests
+    ]
+
+@app.post("/iso-procedures/upload")
+async def upload_iso(
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    file_location = os.path.join("uploads", file.filename)
+
+    with open(file_location, "wb+") as f:
+        f.write(await file.read())
+
+    new_file = IsoProcedure(
+        filename=file.filename,
+        filepath=file_location,
+        uploaded_by=current_user.email
+    )
+
+    db.add(new_file)
+    db.commit()
+
+    return {"message": "ISO Procedure uploaded successfully"}
+
+
+@app.get("/iso-procedures/list")
+async def list_iso(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    files = db.query(IsoProcedure).order_by(IsoProcedure.uploaded_at.desc()).all()
+
+    return [
+        {
+            "id": f.id,
+            "filename": f.filename,
+            "uploaded_by": f.uploaded_by,
+            "uploaded_at": f.uploaded_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for f in files
+    ]
+
+@app.get("/iso-procedures/preview/{id}")
+async def preview_iso(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    file = db.query(IsoProcedure).filter(IsoProcedure.id == id).first()
+
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    return FileResponse(
+        path=file.filepath,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"}
+    )
+    
+
+@app.delete("/iso-procedures/{id}")
+async def delete_iso(
+    id: int,
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin", "Uploader"])(current_user)
+
+    file = db.query(IsoProcedure).filter(IsoProcedure.id == id).first()
+
+    if not file:
+        raise HTTPException(404, "File not found")
+
+    if os.path.exists(file.filepath):
+        os.remove(file.filepath)
+
+    db.delete(file)
+    db.commit()
+
+    return {"message": "Deleted successfully"}
+
+
+@app.get("/admin/login-logs")
+async def get_login_logs(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    require_role(["Admin"])(current_user)
+
+    logs = db.query(LoginLog).order_by(LoginLog.created_at.desc()).all()
+
+    return [
+        {
+            "email": l.email,
+            "status": l.status,
+            "ip_address": l.ip_address,
+            "device": l.user_agent,
+            "time": l.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        for l in logs
+    ]

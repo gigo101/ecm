@@ -1576,7 +1576,7 @@ def classify_document(text: str):
             "provision", "manual", "compliance"
         ],
         "Official Issuances": [
-            "memorandum", "memo" "circular", "resolution",
+            "memorandum", "circular", "resolution",
             "special order", "directive", "moa", "agreement"
         ],
         "News & Events": [
@@ -1597,8 +1597,6 @@ def classify_document(text: str):
             r"\bresolution\s*no\.",
             r"memorandum of agreement",
             r"effectivity",
-            r"memo",
-            r"memo\s*no\.",
         ],
         "Research": [
             r"terminal report",
@@ -1628,7 +1626,7 @@ def classify_document(text: str):
     if re.search(r"(workshop|seminar|training|conference|orientation)", title):
         return "News & Events"
 
-    if re.search(r"(memorandum|circular|resolution|special order|memo)", title):
+    if re.search(r"(memorandum|circular|resolution|special order)", title):
         return "Official Issuances"
 
     if re.search(r"(form|certification)", title):
@@ -1657,7 +1655,7 @@ def classify_document(text: str):
     if re.search(r"(special order|office special order|so no\.?\s*\d+)", header):
         return "Official Issuances"
 
-    if re.search(r"\b(memorandum|circular|resolution|memo)\s*(no\.|#)", header):
+    if re.search(r"\b(memorandum|circular|resolution)\s*(no\.|#)", header):
         return "Official Issuances"
 
     # Form
