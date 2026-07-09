@@ -21,11 +21,17 @@ import Offices from '@/views/Admin/Offices.vue'
 const routes = [
 { 
     path: '/', 
-    component: Login
+    component: Login,
+    meta: {
+        layout: "auth"
+    }
 },
 { 
     path: '/dashboard', 
-    component: Dashboard
+    component: Dashboard,
+     meta: {
+        layout: "app"
+    }
 },
 { 
     path: '/documentss', 

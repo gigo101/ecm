@@ -1,31 +1,20 @@
 <template>
-  <div v-if="route.path === '/documents' || route.path === '/search' || route.path === '/chat' || route.path === '/admin/users' || route.path ==='/documents/upload' || route.path ==='/dashboard' || route.path === '/change-password' || route.path =='/profile' || route.path =='/users' || route.path=='/admin/positions' || route.path=='/admin/offices' || route.path=='/semantic-search' || route.path=='/admin/document-logs' || route.path=='/admin/download-requests' || route.path=='/my-download-requests' || route.path=='/documents/favorites' || route.path=='/documents/my-uploads' || route.path=='/documents/downloadable' || route.path=='/downloadables/upload' || route.path=='/documents/shared' || route.path=='/documents/procedures-manual' || route.path=='/iso-procedures/upload' || route.path=='/admin/login-logs'" class="min-h-screen flex bg-dns_beige">
-    <Sidebar />
-    <div class="flex-1 flex flex-col">
-      <Navbar />
-      <main class="p-6">
+
+    <AppLayout v-if="route.meta.layout === 'app'">
         <router-view />
-      </main>
-    </div>
-  </div>
+    </AppLayout>
 
-  <div v-else class="min-h-screen flex bg-dns_beige">
-    <div class="flex-1 flex flex-col">
-    <main>
-    <router-view />
-
-    </main>
-    </div>
-    </div>
-  
+    <AuthLayout v-else>
+        <router-view />
+    </AuthLayout>
 
 </template>
 
 <script setup>
-import { useRoute } from 'vue-router'
-import Sidebar from '@/layouts/Sidebar.vue'
-import Navbar from '@/layouts/Navbar.vue'
+import { useRoute } from "vue-router"
+
+import AppLayout from "@/layouts/AppLayout.vue"
+import AuthLayout from "@/layouts/AuthLayout.vue"
 
 const route = useRoute()
-
 </script>

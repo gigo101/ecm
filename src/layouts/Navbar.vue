@@ -1,5 +1,7 @@
 <template>
-  <header class="flex items-center justify-between px-6 py-4 bg-white shadow-sm">
+  <header
+    class="sticky top-0 z-40 flex items-center justify-between
+           px-6 py-4 bg-white shadow-sm border-b">
 
     <!-- LEFT SIDE -->
     <div class="flex items-center gap-4">
